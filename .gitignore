@@ -1,9 +1,1 @@
-node_modules/
-.next/
-out/
-dist/
-coverage/
-.env
-.env.*
-!.env.example
-build_anything_protocol/
+node_modules/.next/out/dist/coverage/.env.env.*!.env.examplebuild_anything_protocol/
