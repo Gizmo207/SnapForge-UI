@@ -1,5 +1,4 @@
 {
-  "installCommand": "npm --prefix lab install",
-  "buildCommand": "npm --prefix lab run build",
-  "outputDirectory": "lab/dist"
+  "buildCommand": "if [ -f lab/package.json ]; then npm --prefix lab install && npm --prefix lab run build && rm -rf dist && cp -r lab/dist dist; else npm install && npm run build; fi",
+  "outputDirectory": "dist"
 }
