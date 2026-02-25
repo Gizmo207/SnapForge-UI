@@ -1,4 +1,5 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { registry, type RegistryItem } from './registry'
 import { buildDependencyManifest, formatManifestJSON } from './engine/dependencyGraph'
 import { HeaderBar } from './ui/HeaderBar'
@@ -249,6 +250,7 @@ function App() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+      <Analytics />
     </div>
   )
 }
