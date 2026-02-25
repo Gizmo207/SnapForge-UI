@@ -1,0 +1,12 @@
+{
+  "version": "v1.0.0",
+  "archivedAtUtc": "2026-02-25T23:53:33Z",
+  "commit": "4118164",
+  "node": "v22.14.0",
+  "npm": "10.9.2",
+  "buildCommand": "npm --prefix lab run build",
+  "vercelProjectId": "prj_mS8UsHpTezjlGuugE0LnMgT3kRJi",
+  "railwayServiceId": "2365380d-504d-42eb-872d-1525e165c742",
+  "vercelUrl": "https://snapforge-ui.vercel.app/",
+  "railwayPrivateDomain": "snapforge-ui.railway.internal"
+}

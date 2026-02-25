@@ -147,6 +147,22 @@ function App() {
         onEnterExportMode={() => setExportMode(true)}
       />
 
+      <div
+        style={{
+          padding: '14px 20px 10px',
+          textAlign: 'center',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          background: 'rgba(255,255,255,0.01)',
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          Build once. Reuse everywhere.
+        </div>
+        <div style={{ marginTop: 6, fontSize: 13, color: 'rgba(255,255,255,0.62)' }}>
+          SnapForge UI is a searchable library of reusable UI components you can preview, copy, and export into any project.
+        </div>
+      </div>
+
       <div style={s.body}>
         <Sidebar
           structure={structure}
