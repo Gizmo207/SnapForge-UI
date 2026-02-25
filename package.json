@@ -15,6 +15,9 @@
     "styled-components": "^6.3.11"
   },
   "scripts": {
+    "dev": "npm --prefix lab run dev",
+    "build": "npm --prefix lab run build",
+    "preview": "npm --prefix lab run preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

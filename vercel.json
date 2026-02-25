@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm --prefix lab install",
+  "buildCommand": "npm --prefix lab run build",
+  "outputDirectory": "lab/dist"
+}
