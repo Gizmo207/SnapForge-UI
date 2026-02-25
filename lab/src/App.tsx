@@ -24,7 +24,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSub, setSelectedSub] = useState<string | null>(null)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ primitives: true })
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<RegistryItem | null>(null)
   const [showCode, setShowCode] = useState(false)
   const [search, setSearch] = useState('')
