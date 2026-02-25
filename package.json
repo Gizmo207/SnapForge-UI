@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "npm --prefix lab run dev",
     "build": "npm --prefix lab run build",
+    "start": "npm --prefix lab run server",
     "preview": "npm --prefix lab run preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["npm --prefix lab install --include=dev"]
+
+[phases.build]
+cmds = ["npm --prefix lab run build"]
+
+[start]
+cmd = "npm --prefix lab run server"
