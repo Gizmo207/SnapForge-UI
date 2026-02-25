@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "checkJs": false
+  },
+  "exclude": [
+    "primitives",
+    "components",
+    "patterns",
+    "layouts",
+    "pages"
+  ]
+}

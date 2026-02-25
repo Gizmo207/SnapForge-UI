@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": false,
+    "noEmit": true,
+    "types": [
+      "react",
+      "react-dom"
+    ]
+  },
+  "include": [
+    "primitives/**/*.tsx",
+    "components/**/*.tsx",
+    "patterns/**/*.tsx",
+    "layouts/**/*.tsx",
+    "pages/**/*.tsx",
+    "foundations/**/*.tsx"
+  ]
+}
