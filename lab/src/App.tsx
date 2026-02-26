@@ -295,6 +295,7 @@ function App() {
         <AddComponentModal
           onClose={() => setShowAddModal(false)}
           showToast={(msg, type) => setToast({ message: msg, type })}
+          onSaved={() => window.location.reload()}
         />
       )}
 

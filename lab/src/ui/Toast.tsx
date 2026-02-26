@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { s } from './styles'
 
 type ToastProps = {
@@ -7,6 +8,11 @@ type ToastProps = {
 }
 
 export function Toast({ message, type, onDone }: ToastProps) {
+  useEffect(() => {
+    const timeoutId = window.setTimeout(onDone, 4000)
+    return () => window.clearTimeout(timeoutId)
+  }, [message, type, onDone])
+
   return (
     <div style={{
       position: 'fixed' as const,

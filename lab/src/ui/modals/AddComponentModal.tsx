@@ -9,9 +9,10 @@ import { s } from '../styles'
 type AddComponentModalProps = {
   onClose: () => void
   showToast: (msg: string, type: 'success' | 'error') => void
+  onSaved?: () => void
 }
 
-export function AddComponentModal({ onClose, showToast }: AddComponentModalProps) {
+export function AddComponentModal({ onClose, showToast, onSaved }: AddComponentModalProps) {
   return (
     <div style={s.overlay} onClick={onClose}>
       <div style={{ ...s.modal, maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
@@ -19,13 +20,21 @@ export function AddComponentModal({ onClose, showToast }: AddComponentModalProps
           <div style={{ fontSize: 16, fontWeight: 600 }}>Add Component</div>
           <button onClick={onClose} style={s.modalClose}>x</button>
         </div>
-        <AddComponentForm onClose={onClose} showToast={showToast} />
+        <AddComponentForm onClose={onClose} showToast={showToast} onSaved={onSaved} />
       </div>
     </div>
   )
 }
 
-function AddComponentForm({ onClose, showToast }: { onClose: () => void; showToast: (msg: string, type: 'success' | 'error') => void }) {
+function AddComponentForm({
+  onClose,
+  showToast,
+  onSaved,
+}: {
+  onClose: () => void
+  showToast: (msg: string, type: 'success' | 'error') => void
+  onSaved?: () => void
+}) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [parsed, setParsed] = useState<ReturnType<typeof parseComponent> | null>(null)
@@ -65,6 +74,9 @@ function AddComponentForm({ onClose, showToast }: { onClose: () => void; showToa
 
     setSaving(false)
     onClose()
+    if (onSaved) {
+      window.setTimeout(onSaved, 250)
+    }
   }
 
   const handleBack = () => { setParsed(null); setPostprocessResult(null) }
