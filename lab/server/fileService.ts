@@ -98,6 +98,12 @@ function generateMeta(req: SaveRequest): string {
 };\n\n`;
 }
 
+function detectFramework(code: string): 'react' | 'html' {
+  const hasReactImport = /import\s+.*from\s+['"]react['"]/.test(code);
+  const hasUseState = code.includes('useState(');
+  return hasReactImport || hasUseState ? 'react' : 'html';
+}
+
 function extractImports(code: string): { imports: string; body: string } {
   const lines = code.split('\n');
   const importLines: string[] = [];
@@ -193,6 +199,7 @@ export function deleteComponent(filePath: string): { success: boolean; message: 
 }
 
 export function saveComponent(req: SaveRequest): SaveResult {
+  const detectedFramework = detectFramework(req.code);
   const fileName = normalizeName(req.name);
   const dirPath = path.join(TEMPLATES_ROOT, req.category, req.subcategory, fileName);
   const filePath = path.join(dirPath, 'react.tsx');
@@ -206,15 +213,15 @@ export function saveComponent(req: SaveRequest): SaveResult {
     console.log('Attempting to save...');
     fs.mkdirSync(dirPath, { recursive: true });
 
-    const finalCode = wrapCode(req);
+    const finalCode = wrapCode({ ...req, framework: detectedFramework });
     console.log('Code wrapped, writing file...');
     fs.writeFileSync(filePath, finalCode, 'utf-8');
 
-    if (req.htmlSource && req.htmlSource.trim()) {
+    if (detectedFramework === 'html' && req.htmlSource && req.htmlSource.trim()) {
       fs.writeFileSync(path.join(dirPath, 'html.html'), req.htmlSource, 'utf-8');
     }
 
-    if (req.cssSource && req.cssSource.trim()) {
+    if (detectedFramework === 'html' && req.cssSource && req.cssSource.trim()) {
       fs.writeFileSync(path.join(dirPath, 'styles.css'), req.cssSource, 'utf-8');
     }
 

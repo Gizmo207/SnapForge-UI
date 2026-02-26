@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import type { RegistryItem } from '../../registry'
+import { generateReactPreviewHtml, isUnsafePreviewSource } from '../../utils/reactPreviewEngine'
 import { s } from '../styles'
 
 type DetailModalProps = {
@@ -23,10 +24,15 @@ export function DetailModal({
   onCopyCode,
   onDelete,
 }: DetailModalProps) {
-  const hasPreview = Boolean(item.component || item.htmlSource)
-  const srcDoc = item.htmlSource
-    ? `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;}*{box-sizing:border-box;}${item.cssSource || ''}</style></head><body>${item.htmlSource}</body></html>`
-    : undefined
+  const framework = item.meta?.type === 'react' ? 'react' : 'html'
+  const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
+  const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
+  const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(item.component)
+  const srcDoc = hasReactPreview
+    ? generateReactPreviewHtml(item.source || '')
+    : hasHtmlPreview
+      ? `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;}*{box-sizing:border-box;}${item.cssSource || ''}</style></head><body>${item.htmlSource}</body></html>`
+      : undefined
 
   return (
     <div style={s.overlay} onClick={onClose}>
@@ -79,7 +85,7 @@ export function DetailModal({
                 {srcDoc ? (
                   <iframe
                     title={`${item.meta?.name || item.path}-modal-preview`}
-                    sandbox=""
+                    sandbox="allow-scripts"
                     srcDoc={srcDoc}
                     style={{ width: '100%', height: '100%', border: 'none', background: 'transparent' }}
                   />

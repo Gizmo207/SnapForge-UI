@@ -47,7 +47,7 @@ app.post('/save-component', (req, res) => {
     code,
     htmlSource,
     cssSource,
-    framework: framework || 'unknown',
+    framework: framework || 'html',
     category,
     subcategory,
     tags: tags || [],

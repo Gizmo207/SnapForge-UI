@@ -4,6 +4,7 @@ import { parseComponent } from '../../parser/parseComponent'
 import { ValidationBadge, ValidationPanel, type PostprocessResult } from '../../components/ValidationStatus'
 import { copyToClipboard } from '../../services/clipboardService'
 import { postprocessComponent, saveComponent } from '../../services/fileServiceClient'
+import { isUnsafePreviewSource } from '../../utils/reactPreviewEngine'
 import { s } from '../styles'
 
 type AddComponentModalProps = {
@@ -51,13 +52,19 @@ function AddComponentForm({
 
   const handleConfirm = async () => {
     if (!parsed || saving) return
+
+    if (parsed.framework === 'react' && isUnsafePreviewSource(code)) {
+      showToast('Blocked: preview source contains restricted tokens (<script, window., document., eval().', 'error')
+      return
+    }
+
     setSaving(true)
     const payload = {
       ...parsed,
       name: name || parsed.name,
       code,
-      htmlSource: previewHtml.trim() || undefined,
-      cssSource: previewCss.trim() || undefined,
+      htmlSource: parsed.framework === 'html' ? (previewHtml.trim() || undefined) : undefined,
+      cssSource: parsed.framework === 'html' ? (previewCss.trim() || undefined) : undefined,
     }
     let relativePath = ''
     try {
