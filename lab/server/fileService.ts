@@ -30,6 +30,26 @@ export type SaveResult = {
   message: string;
 };
 
+type ComponentMeta = {
+  name: string;
+  category: string;
+  subcategory: string;
+  type: string;
+  tags: string[];
+  dependencies: string[];
+};
+
+export type ComponentCatalogItem = {
+  path: string;
+  componentDir: string;
+  source?: string;
+  htmlSource?: string;
+  cssSource?: string;
+  meta?: ComponentMeta;
+};
+
+const SCAN_ROOTS = ['primitives', 'components', 'templates', 'patterns', 'layouts', 'pages', 'foundations'];
+
 function updateTsconfig() {
   console.log('updateTsconfig called');
   console.log('TSCONFIG_PATH:', TSCONFIG_PATH);
@@ -210,4 +230,124 @@ export function saveComponent(req: SaveRequest): SaveResult {
       message: err instanceof Error ? err.message : 'Unknown error',
     };
   }
+}
+
+function readTextIfExists(filePath: string): string | undefined {
+  if (!fs.existsSync(filePath)) return undefined;
+  return fs.readFileSync(filePath, 'utf-8');
+}
+
+function titleFromSlug(slug: string): string {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function parseMetaFromSource(source: string): ComponentMeta | undefined {
+  const metaBlockMatch = source.match(/export\s+const\s+meta\s*=\s*\{([\s\S]*?)\}\s*;?/m);
+  if (!metaBlockMatch) return undefined;
+  const block = metaBlockMatch[1];
+
+  const readString = (field: string): string | undefined => {
+    const match = block.match(new RegExp(`${field}\\s*:\\s*["'\`]([^"'\`]+)["'\`]`, 'm'));
+    return match?.[1];
+  };
+
+  const readArray = (field: string): string[] => {
+    const match = block.match(new RegExp(`${field}\\s*:\\s*\\[([\\s\\S]*?)\\]`, 'm'));
+    if (!match) return [];
+    const items: string[] = [];
+    const re = /["'`]([^"'`]+)["'`]/g;
+    let entry: RegExpExecArray | null;
+    entry = re.exec(match[1]);
+    while (entry) {
+      items.push(entry[1]);
+      entry = re.exec(match[1]);
+    }
+    return items;
+  };
+
+  const name = readString('name');
+  const category = readString('category');
+  const subcategory = readString('subcategory');
+  const type = readString('type') ?? 'react';
+
+  if (!name || !category || !subcategory) return undefined;
+
+  return {
+    name,
+    category,
+    subcategory,
+    type,
+    tags: readArray('tags'),
+    dependencies: readArray('dependencies'),
+  };
+}
+
+function inferMetaFromPath(relativePath: string): ComponentMeta {
+  const parts = relativePath.split('/');
+  const category = parts[0] || 'components';
+  const subcategory = parts[1] || 'misc';
+  const componentSlug = parts[2] || path.basename(path.dirname(relativePath));
+
+  return {
+    name: titleFromSlug(componentSlug),
+    category,
+    subcategory,
+    type: 'react',
+    tags: [],
+    dependencies: [],
+  };
+}
+
+function walkReactEntries(dirPath: string, out: string[]) {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      walkReactEntries(fullPath, out);
+      continue;
+    }
+    if (entry.isFile() && entry.name === 'react.tsx') {
+      out.push(fullPath);
+    }
+  }
+}
+
+export function listComponents(): ComponentCatalogItem[] {
+  const reactEntries: string[] = [];
+
+  for (const root of SCAN_ROOTS) {
+    const rootPath = path.join(TEMPLATES_ROOT, root);
+    if (!fs.existsSync(rootPath)) continue;
+    walkReactEntries(rootPath, reactEntries);
+  }
+
+  const items = reactEntries.map((filePath) => {
+    const pathRel = path.relative(TEMPLATES_ROOT, filePath).replace(/\\/g, '/');
+    const componentDir = pathRel.replace(/\/react\.tsx$/, '');
+    const source = fs.readFileSync(filePath, 'utf-8');
+    const htmlSource = readTextIfExists(path.join(TEMPLATES_ROOT, componentDir, 'html.html'));
+    const cssSource = readTextIfExists(path.join(TEMPLATES_ROOT, componentDir, 'styles.css'));
+    const meta = parseMetaFromSource(source) ?? inferMetaFromPath(pathRel);
+
+    return {
+      path: pathRel,
+      componentDir,
+      source,
+      htmlSource,
+      cssSource,
+      meta,
+    };
+  });
+
+  items.sort((a, b) => {
+    const aName = a.meta?.name?.toLowerCase() ?? a.path.toLowerCase();
+    const bName = b.meta?.name?.toLowerCase() ?? b.path.toLowerCase();
+    return aName.localeCompare(bName);
+  });
+
+  return items;
 }

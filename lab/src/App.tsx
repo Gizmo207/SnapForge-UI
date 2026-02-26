@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type React from 'react'
-import { registry, type RegistryItem } from './registry'
+import type { RegistryItem } from './registry'
 import { buildDependencyManifest, formatManifestJSON } from './engine/dependencyGraph'
 import { HeaderBar } from './ui/HeaderBar'
 import { Sidebar } from './ui/Sidebar'
@@ -12,7 +12,7 @@ import { Toast } from './ui/Toast'
 import { s } from './ui/styles'
 import { copyToClipboard } from './services/clipboardService'
 import { confirmDialog } from './services/dialogService'
-import { deleteComponent, exportZip } from './services/fileServiceClient'
+import { deleteComponent, exportZip, fetchComponents } from './services/fileServiceClient'
 import {
   buildHtmlExportBundle,
   buildReactExportBundle,
@@ -38,6 +38,20 @@ function App() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportFramework, setExportFramework] = useState<ExportFramework>('react')
   const [exportDownloading, setExportDownloading] = useState(false)
+  const [registryItems, setRegistryItems] = useState<RegistryItem[]>([])
+
+  const loadComponents = async () => {
+    try {
+      const items = await fetchComponents()
+      setRegistryItems(items)
+    } catch (err: unknown) {
+      setToast({ message: err instanceof Error ? err.message : 'Failed to load components', type: 'error' })
+    }
+  }
+
+  useEffect(() => {
+    void loadComponents()
+  }, [])
 
   const themeVars: React.CSSProperties = themeMode === 'dark'
     ? {
@@ -91,19 +105,19 @@ function App() {
 
   const structure = CATEGORY_ORDER.reduce<Record<string, string[]>>((acc, cat) => {
     const subs = new Set<string>()
-    registry.forEach((item) => {
+    registryItems.forEach((item) => {
       if (item.meta?.category === cat && item.meta?.subcategory) subs.add(item.meta.subcategory)
     })
     if (subs.size > 0) acc[cat] = Array.from(subs).sort()
     return acc
   }, {})
 
-  const allTags = Array.from(new Set(registry.flatMap((item) => item.meta?.tags || []))).sort()
+  const allTags = Array.from(new Set(registryItems.flatMap((item) => item.meta?.tags || []))).sort()
 
   const countFor = (cat: string, sub?: string) =>
-    registry.filter((item) => item.meta?.category === cat && (sub ? item.meta?.subcategory === sub : true)).length
+    registryItems.filter((item) => item.meta?.category === cat && (sub ? item.meta?.subcategory === sub : true)).length
 
-  const filtered = registry.filter((item) => {
+  const filtered = registryItems.filter((item) => {
     const matchCat = selectedCategory ? item.meta?.category === selectedCategory : true
     const matchSub = selectedSub ? item.meta?.subcategory === selectedSub : true
     const matchTag = selectedTag ? item.meta?.tags?.includes(selectedTag) : true
@@ -134,6 +148,7 @@ function App() {
       const result = await deleteComponent(cleanedPath)
       setToast({ message: result.message, type: 'success' })
       setSelected(null)
+      await loadComponents()
     } catch (err: unknown) {
       setToast({ message: err instanceof Error ? err.message : 'Delete failed', type: 'error' })
     }
@@ -220,7 +235,7 @@ function App() {
       <div style={s.body}>
         <Sidebar
           structure={structure}
-          registryLength={registry.length}
+          registryLength={registryItems.length}
           selectedCategory={selectedCategory}
           selectedSub={selectedSub}
           selectedTag={selectedTag}
@@ -295,7 +310,9 @@ function App() {
         <AddComponentModal
           onClose={() => setShowAddModal(false)}
           showToast={(msg, type) => setToast({ message: msg, type })}
-          onSaved={() => window.location.reload()}
+          onSaved={() => {
+            void loadComponents()
+          }}
         />
       )}
 

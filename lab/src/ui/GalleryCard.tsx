@@ -40,7 +40,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
         </div>
       )}
       <div style={s.cardPreview}>
-        {Component && createElement(Component)}
+        {Component ? createElement(Component) : <div style={{ opacity: 0.45, fontSize: 12 }}>Preview unavailable</div>}
       </div>
       <div style={s.cardInfo}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -50,14 +50,16 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
           </div>
           {hovered && !exportMode && (
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-              <button
-                style={s.cardBtn}
-                onClick={onOpenPreview}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
-              >
-                Preview
-              </button>
+              {Component && (
+                <button
+                  style={s.cardBtn}
+                  onClick={onOpenPreview}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.2)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
+                >
+                  Preview
+                </button>
+              )}
               <button
                 style={s.cardBtn}
                 onClick={onOpenCode}

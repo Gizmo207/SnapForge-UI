@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { saveComponent, deleteComponent } from './fileService.js';
+import { saveComponent, deleteComponent, listComponents } from './fileService.js';
 import { sanitizeFile } from './sanitizeService.js';
 import { parseCheckFile } from './parseCheckService.js';
 import { exportZipToResponse } from './exportZipService.js';
@@ -17,6 +17,18 @@ const PORT = Number(process.env.PORT) || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+app.get('/components', (_req, res) => {
+  try {
+    const items = listComponents();
+    res.json({ success: true, items });
+  } catch (err: unknown) {
+    res.status(500).json({
+      success: false,
+      message: err instanceof Error ? err.message : 'Failed to load components',
+    });
+  }
+});
 
 app.post('/save-component', (req, res) => {
   const { name, code, framework, category, subcategory, tags, dependencies } = req.body;

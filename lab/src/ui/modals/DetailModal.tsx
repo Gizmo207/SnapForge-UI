@@ -36,8 +36,10 @@ export function DetailModal({
                 ...s.modalTab,
                 background: !showCode ? 'var(--brand-bg)' : 'var(--surface-input)',
                 borderColor: !showCode ? 'var(--brand-border)' : 'var(--border-strong)',
+                opacity: item.component ? 1 : 0.5,
+                cursor: item.component ? 'pointer' : 'not-allowed',
               }}
-              onClick={onShowPreview}
+              onClick={item.component ? onShowPreview : undefined}
             >
               Preview
             </button>
@@ -68,7 +70,11 @@ export function DetailModal({
                 <pre style={s.codeBlock}><code>{item.source}</code></pre>
               </div>
             ) : (
-              <div style={s.previewArea}>{item.component && createElement(item.component, { key: `modal-${item.path}` })}</div>
+              <div style={s.previewArea}>
+                {item.component
+                  ? createElement(item.component, { key: `modal-${item.path}` })
+                  : <div style={{ opacity: 0.5, fontSize: 12 }}>Preview unavailable in remote catalog mode.</div>}
+              </div>
             )}
           </div>
 

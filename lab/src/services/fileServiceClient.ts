@@ -1,4 +1,6 @@
-const FILE_SERVICE_URL = import.meta.env.VITE_API_BASE_URL
+import type { RegistryItem } from '../registry'
+
+export const FILE_SERVICE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
 
 console.log('PROD API BASE:', FILE_SERVICE_URL)
 
@@ -28,6 +30,22 @@ export type SavePayload = {
   dependencies: string[]
 }
 
+type ComponentCatalogItem = {
+  path: string
+  componentDir: string
+  source?: string
+  htmlSource?: string
+  cssSource?: string
+  meta?: {
+    name: string
+    category: string
+    subcategory: string
+    type: string
+    tags: string[]
+    dependencies: string[]
+  }
+}
+
 async function parseJsonResponse(res: Response) {
   const data = await res.json()
   if (!res.ok) {
@@ -44,6 +62,21 @@ export async function saveComponent(payload: SavePayload) {
     body: JSON.stringify(payload),
   })
   return parseJsonResponse(res)
+}
+
+export async function fetchComponents(): Promise<RegistryItem[]> {
+  const res = await fetch(`${FILE_SERVICE_URL}/components`)
+  const data = await parseJsonResponse(res)
+  const items = (data.items || []) as ComponentCatalogItem[]
+  return items.map((item) => ({
+    path: item.path,
+    componentDir: item.componentDir,
+    component: undefined,
+    source: item.source,
+    htmlSource: item.htmlSource,
+    cssSource: item.cssSource,
+    meta: item.meta,
+  }))
 }
 
 export async function deleteComponent(filePath: string) {
