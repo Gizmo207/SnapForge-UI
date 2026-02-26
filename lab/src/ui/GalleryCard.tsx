@@ -5,6 +5,7 @@ import {
   generateReactPreviewHtml,
   isUnsafePreviewSource,
   PREVIEW_RESIZE_EVENT,
+  PREVIEW_STATUS_EVENT,
 } from '../utils/reactPreviewEngine'
 import { s } from './styles'
 
@@ -20,31 +21,58 @@ type GalleryCardProps = {
 export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, onOpenPreview, onOpenCode }: GalleryCardProps) {
   const [hovered, setHovered] = useState(false)
   const [iframeHeight, setIframeHeight] = useState(220)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
   const Component = item.component
   const previewId = useMemo(() => `card-${item.path}`, [item.path])
   const framework = item.meta?.type === 'react' ? 'react' : 'html'
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(Component)
+  const srcDoc = hasReactPreview
+    ? generateReactPreviewHtml(item.source || '', previewId)
+    : hasHtmlPreview
+      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId)
+      : undefined
+
+  useEffect(() => {
+    if (!srcDoc) {
+      setPreviewLoading(false)
+      setPreviewError(null)
+      return
+    }
+    setPreviewLoading(true)
+    setPreviewError(null)
+  }, [srcDoc])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; previewId?: string; height?: number } | undefined
-      if (!data || data.type !== PREVIEW_RESIZE_EVENT || data.previewId !== previewId) return
-      if (typeof data.height === 'number' && Number.isFinite(data.height)) {
+      const data = event.data as {
+        type?: string
+        previewId?: string
+        height?: number
+        status?: string
+        message?: string
+      } | undefined
+      if (!data || data.previewId !== previewId) return
+
+      if (data.type === PREVIEW_RESIZE_EVENT && typeof data.height === 'number' && Number.isFinite(data.height)) {
         setIframeHeight(Math.max(120, Math.ceil(data.height)))
+        return
+      }
+
+      if (data.type === PREVIEW_STATUS_EVENT) {
+        if (data.status === 'ready') setPreviewLoading(false)
+        if (data.status === 'error') {
+          setPreviewLoading(false)
+          setPreviewError(data.message || 'Preview failed')
+        }
       }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [previewId])
-
-  const srcDoc = hasReactPreview
-    ? generateReactPreviewHtml(item.source || '', previewId)
-    : hasHtmlPreview
-      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId)
-      : undefined
 
   return (
     <div
@@ -70,14 +98,35 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
           {exportChecked ? '✓' : ''}
         </div>
       )}
-      <div style={{ ...s.cardPreview, height: srcDoc ? iframeHeight : s.cardPreview.height }}>
+      <div style={{ ...s.cardPreview, padding: srcDoc ? 12 : 0, height: srcDoc ? Math.max(180, iframeHeight + 24) : s.cardPreview.height }}>
         {srcDoc ? (
-          <iframe
-            title={`${item.meta?.name || item.path}-preview`}
-            sandbox="allow-scripts"
-            srcDoc={srcDoc}
-            style={{ width: '100%', height: iframeHeight, border: 'none', background: 'transparent', pointerEvents: 'none' }}
-          />
+          <>
+            <iframe
+              title={`${item.meta?.name || item.path}-preview`}
+              sandbox="allow-scripts"
+              srcDoc={srcDoc}
+              style={{
+                width: '100%',
+                height: iframeHeight,
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 10,
+                background: 'rgba(255,255,255,0.02)',
+                pointerEvents: 'none',
+              }}
+            />
+            {previewLoading && (
+              <div style={s.previewOverlay}>
+                <div style={s.previewSpinner} />
+                <div style={s.previewOverlayText}>Loading preview...</div>
+              </div>
+            )}
+            {previewError && (
+              <div style={s.previewOverlay}>
+                <div style={s.previewErrorTitle}>Preview failed</div>
+                <div style={s.previewErrorText}>{previewError}</div>
+              </div>
+            )}
+          </>
         ) : Component ? (
           createElement(Component)
         ) : (

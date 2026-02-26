@@ -1,5 +1,6 @@
 const PREVIEW_BLOCKLIST = ['<script', 'window.', 'document.', 'eval(']
 export const PREVIEW_RESIZE_EVENT = 'SNAPFORGE_PREVIEW_RESIZE'
+export const PREVIEW_STATUS_EVENT = 'SNAPFORGE_PREVIEW_STATUS'
 
 export function isUnsafePreviewSource(sourceCode: string): boolean {
   const lower = sourceCode.toLowerCase()
@@ -13,6 +14,12 @@ function serializeForTemplate(input: string): string {
 function buildResizeScript(previewId: string): string {
   const serializedId = serializeForTemplate(previewId)
   return `
+      function __snapforgePostStatus(status, message) {
+        window.parent.postMessage(
+          { type: "${PREVIEW_STATUS_EVENT}", previewId: ${serializedId}, status, message },
+          "*"
+        );
+      }
       function __snapforgeReportSize() {
         const bodyHeight = document.body ? document.body.scrollHeight : 0;
         const docHeight = document.documentElement ? document.documentElement.scrollHeight : 0;
@@ -22,12 +29,23 @@ function buildResizeScript(previewId: string): string {
           "*"
         );
       }
+      window.addEventListener('error', function(event) {
+        const message = event && event.error && event.error.message
+          ? event.error.message
+          : (event && event.message ? event.message : 'Preview runtime error');
+        __snapforgePostStatus('error', message);
+      });
+      window.addEventListener('unhandledrejection', function(event) {
+        const reason = event && event.reason ? event.reason : 'Unhandled promise rejection';
+        __snapforgePostStatus('error', String(reason));
+      });
       setTimeout(__snapforgeReportSize, 50);
       window.addEventListener('load', __snapforgeReportSize);
       if (window.ResizeObserver) {
         const __snapforgeObserver = new ResizeObserver(__snapforgeReportSize);
         __snapforgeObserver.observe(document.body);
       }
+      setTimeout(function() { __snapforgePostStatus('ready', 'ok'); }, 80);
   `
 }
 
@@ -77,15 +95,21 @@ export function generateReactPreviewHtml(sourceCode: string, previewId: string):
       <script type="text/babel">
         const exports = {};
         const styled = window.styled;
+        ${buildResizeScript(previewId)}
         ${safeSource}
         exports.default = ${exportTarget};
 
         const Component = exports.default || Object.values(exports)[0];
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        if (Component) {
-          root.render(React.createElement(Component));
+        try {
+          if (Component) {
+            root.render(React.createElement(Component));
+          } else {
+            throw new Error('No default component export found for preview');
+          }
+        } catch (error) {
+          __snapforgePostStatus('error', error && error.message ? error.message : 'Render failed');
         }
-        ${buildResizeScript(previewId)}
       </script>
     </body>
   </html>
