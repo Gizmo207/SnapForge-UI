@@ -86,7 +86,18 @@ export function generateReactPreviewHtml(sourceCode: string, previewId: string):
       <script src="https://unpkg.com/styled-components/dist/styled-components.min.js"></script>
       <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
       <style>
-        body { margin: 0; padding: 16px; font-family: sans-serif; }
+        html, body, #root {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          background: transparent;
+        }
+        body {
+          padding: 16px;
+          font-family: sans-serif;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
       </style>
     </head>
     <body>
@@ -117,7 +128,7 @@ export function generateReactPreviewHtml(sourceCode: string, previewId: string):
 }
 
 export function generateHtmlPreviewHtml(htmlSource: string, cssSource: string, previewId: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;}*{box-sizing:border-box;}${cssSource || ''}</style></head><body>${htmlSource}
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;overflow:hidden;}*{box-sizing:border-box;}${cssSource || ''}</style></head><body>${htmlSource}
   <script>
   ${buildResizeScript(previewId)}
   <\/script>

@@ -126,9 +126,8 @@ const s: Record<string, React.CSSProperties> = {
     height: '60vh',
   },
   grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: 20,
+    columnWidth: 300,
+    columnGap: 20,
   },
   card: {
     position: 'relative' as const,
@@ -140,6 +139,10 @@ const s: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    display: 'inline-block',
+    width: '100%',
+    marginBottom: 20,
+    breakInside: 'avoid' as const,
   },
   cardPreview: {
     display: 'flex',
