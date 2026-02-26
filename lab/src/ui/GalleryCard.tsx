@@ -14,6 +14,10 @@ type GalleryCardProps = {
 export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, onOpenPreview, onOpenCode }: GalleryCardProps) {
   const [hovered, setHovered] = useState(false)
   const Component = item.component
+  const hasPreview = Boolean(Component || item.htmlSource)
+  const srcDoc = item.htmlSource
+    ? `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;}*{box-sizing:border-box;}${item.cssSource || ''}</style></head><body>${item.htmlSource}</body></html>`
+    : undefined
 
   return (
     <div
@@ -40,7 +44,18 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
         </div>
       )}
       <div style={s.cardPreview}>
-        {Component ? createElement(Component) : <div style={{ opacity: 0.45, fontSize: 12 }}>Preview unavailable</div>}
+        {srcDoc ? (
+          <iframe
+            title={`${item.meta?.name || item.path}-preview`}
+            sandbox=""
+            srcDoc={srcDoc}
+            style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', pointerEvents: 'none' }}
+          />
+        ) : Component ? (
+          createElement(Component)
+        ) : (
+          <div style={{ opacity: 0.45, fontSize: 12 }}>Preview unavailable</div>
+        )}
       </div>
       <div style={s.cardInfo}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -50,7 +65,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
           </div>
           {hovered && !exportMode && (
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-              {Component && (
+              {hasPreview && (
                 <button
                   style={s.cardBtn}
                   onClick={onOpenPreview}

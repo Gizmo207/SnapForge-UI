@@ -15,6 +15,8 @@ const CATEGORIES = ['primitives', 'components', 'patterns', 'layouts', 'pages', 
 export type SaveRequest = {
   name: string;
   code: string;
+  htmlSource?: string;
+  cssSource?: string;
   framework: string;
   category: string;
   subcategory: string;
@@ -207,6 +209,15 @@ export function saveComponent(req: SaveRequest): SaveResult {
     const finalCode = wrapCode(req);
     console.log('Code wrapped, writing file...');
     fs.writeFileSync(filePath, finalCode, 'utf-8');
+
+    if (req.htmlSource && req.htmlSource.trim()) {
+      fs.writeFileSync(path.join(dirPath, 'html.html'), req.htmlSource, 'utf-8');
+    }
+
+    if (req.cssSource && req.cssSource.trim()) {
+      fs.writeFileSync(path.join(dirPath, 'styles.css'), req.cssSource, 'utf-8');
+    }
+
     console.log('File written successfully!');
     
     // Update tsconfig after save

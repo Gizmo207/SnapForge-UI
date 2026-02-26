@@ -23,6 +23,8 @@ type ExportZipComponent = {
 export type SavePayload = {
   name: string
   code: string
+  htmlSource?: string
+  cssSource?: string
   framework: string
   category: string
   subcategory: string

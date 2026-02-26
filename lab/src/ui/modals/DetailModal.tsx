@@ -23,6 +23,11 @@ export function DetailModal({
   onCopyCode,
   onDelete,
 }: DetailModalProps) {
+  const hasPreview = Boolean(item.component || item.htmlSource)
+  const srcDoc = item.htmlSource
+    ? `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;}*{box-sizing:border-box;}${item.cssSource || ''}</style></head><body>${item.htmlSource}</body></html>`
+    : undefined
+
   return (
     <div style={s.overlay} onClick={onClose}>
       <div style={s.modal} onClick={(e) => e.stopPropagation()}>
@@ -36,10 +41,10 @@ export function DetailModal({
                 ...s.modalTab,
                 background: !showCode ? 'var(--brand-bg)' : 'var(--surface-input)',
                 borderColor: !showCode ? 'var(--brand-border)' : 'var(--border-strong)',
-                opacity: item.component ? 1 : 0.5,
-                cursor: item.component ? 'pointer' : 'not-allowed',
+                opacity: hasPreview ? 1 : 0.5,
+                cursor: hasPreview ? 'pointer' : 'not-allowed',
               }}
-              onClick={item.component ? onShowPreview : undefined}
+              onClick={hasPreview ? onShowPreview : undefined}
             >
               Preview
             </button>
@@ -71,7 +76,14 @@ export function DetailModal({
               </div>
             ) : (
               <div style={s.previewArea}>
-                {item.component
+                {srcDoc ? (
+                  <iframe
+                    title={`${item.meta?.name || item.path}-modal-preview`}
+                    sandbox=""
+                    srcDoc={srcDoc}
+                    style={{ width: '100%', height: '100%', border: 'none', background: 'transparent' }}
+                  />
+                ) : item.component
                   ? createElement(item.component, { key: `modal-${item.path}` })
                   : <div style={{ opacity: 0.5, fontSize: 12 }}>Preview unavailable in remote catalog mode.</div>}
               </div>

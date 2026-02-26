@@ -37,6 +37,8 @@ function AddComponentForm({
 }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewCss, setPreviewCss] = useState('')
   const [parsed, setParsed] = useState<ReturnType<typeof parseComponent> | null>(null)
   const [postprocessResult, setPostprocessResult] = useState<PostprocessResult | null>(null)
   const [saving, setSaving] = useState(false)
@@ -50,7 +52,13 @@ function AddComponentForm({
   const handleConfirm = async () => {
     if (!parsed || saving) return
     setSaving(true)
-    const payload = { ...parsed, name: name || parsed.name, code }
+    const payload = {
+      ...parsed,
+      name: name || parsed.name,
+      code,
+      htmlSource: previewHtml.trim() || undefined,
+      cssSource: previewCss.trim() || undefined,
+    }
     let relativePath = ''
     try {
       const result = await saveComponent(payload)
@@ -157,6 +165,24 @@ function AddComponentForm({
           onChange={(e) => setCode(e.target.value)}
           placeholder="Paste your component code here..."
           style={{ ...s.formInput, minHeight: 200, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
+        />
+      </div>
+      <div>
+        <div style={s.formLabel}>Preview HTML (optional)</div>
+        <textarea
+          value={previewHtml}
+          onChange={(e) => setPreviewHtml(e.target.value)}
+          placeholder="HTML used for runtime iframe preview"
+          style={{ ...s.formInput, minHeight: 120, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
+        />
+      </div>
+      <div>
+        <div style={s.formLabel}>Preview CSS (optional)</div>
+        <textarea
+          value={previewCss}
+          onChange={(e) => setPreviewCss(e.target.value)}
+          placeholder="Optional CSS for iframe preview"
+          style={{ ...s.formInput, minHeight: 100, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
         />
       </div>
       <button style={s.submitBtn} onClick={handleAnalyze}>

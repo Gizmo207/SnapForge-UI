@@ -31,7 +31,7 @@ app.get('/components', (_req, res) => {
 });
 
 app.post('/save-component', (req, res) => {
-  const { name, code, framework, category, subcategory, tags, dependencies } = req.body;
+  const { name, code, htmlSource, cssSource, framework, category, subcategory, tags, dependencies } = req.body;
 
   if (!name || !code || !category || !subcategory) {
     res.status(400).json({
@@ -45,6 +45,8 @@ app.post('/save-component', (req, res) => {
   const result = saveComponent({
     name,
     code,
+    htmlSource,
+    cssSource,
     framework: framework || 'unknown',
     category,
     subcategory,
