@@ -1,11 +1,37 @@
 const PREVIEW_BLOCKLIST = ['<script', 'window.', 'document.', 'eval(']
+export const PREVIEW_RESIZE_EVENT = 'SNAPFORGE_PREVIEW_RESIZE'
 
 export function isUnsafePreviewSource(sourceCode: string): boolean {
   const lower = sourceCode.toLowerCase()
   return PREVIEW_BLOCKLIST.some((token) => lower.includes(token))
 }
 
-export function generateReactPreviewHtml(sourceCode: string): string {
+function serializeForTemplate(input: string): string {
+  return JSON.stringify(input)
+}
+
+function buildResizeScript(previewId: string): string {
+  const serializedId = serializeForTemplate(previewId)
+  return `
+      function __snapforgeReportSize() {
+        const bodyHeight = document.body ? document.body.scrollHeight : 0;
+        const docHeight = document.documentElement ? document.documentElement.scrollHeight : 0;
+        const height = Math.max(bodyHeight, docHeight, 120);
+        window.parent.postMessage(
+          { type: "${PREVIEW_RESIZE_EVENT}", previewId: ${serializedId}, height },
+          "*"
+        );
+      }
+      setTimeout(__snapforgeReportSize, 50);
+      window.addEventListener('load', __snapforgeReportSize);
+      if (window.ResizeObserver) {
+        const __snapforgeObserver = new ResizeObserver(__snapforgeReportSize);
+        __snapforgeObserver.observe(document.body);
+      }
+  `
+}
+
+export function generateReactPreviewHtml(sourceCode: string, previewId: string): string {
   const withoutImports = sourceCode
     .split('\n')
     .filter((line) => !line.trim().startsWith('import '))
@@ -59,8 +85,17 @@ export function generateReactPreviewHtml(sourceCode: string): string {
         if (Component) {
           root.render(React.createElement(Component));
         }
+        ${buildResizeScript(previewId)}
       </script>
     </body>
   </html>
   `;
+}
+
+export function generateHtmlPreviewHtml(htmlSource: string, cssSource: string, previewId: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;color:inherit;}*{box-sizing:border-box;}${cssSource || ''}</style></head><body>${htmlSource}
+  <script>
+  ${buildResizeScript(previewId)}
+  <\/script>
+  </body></html>`
 }
