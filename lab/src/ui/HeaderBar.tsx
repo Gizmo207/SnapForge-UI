@@ -10,6 +10,8 @@ type HeaderBarProps = {
   onOpenExportModal: () => void
   onExitExportMode: () => void
   onEnterExportMode: () => void
+  themeMode: 'dark' | 'light'
+  onToggleTheme: () => void
 }
 
 export function HeaderBar({
@@ -22,6 +24,8 @@ export function HeaderBar({
   onOpenExportModal,
   onExitExportMode,
   onEnterExportMode,
+  themeMode,
+  onToggleTheme,
 }: HeaderBarProps) {
   return (
     <div style={s.header}>
@@ -41,21 +45,29 @@ export function HeaderBar({
         <button
           style={s.addBtn}
           onClick={onOpenAddModal}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.25)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.15)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--brand-bg-hover)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--brand-bg)' }}
         >
           + Add
+        </button>
+        <button
+          style={{ ...s.addBtn, background: 'var(--surface-button)', borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }}
+          onClick={onToggleTheme}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-button-hover)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
+        >
+          {themeMode === 'dark' ? 'Light' : 'Dark'}
         </button>
         {exportMode ? (
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              style={{ ...s.addBtn, background: exportSelectedCount > 0 ? 'rgba(100,220,140,0.2)' : 'rgba(255,255,255,0.06)', borderColor: exportSelectedCount > 0 ? 'rgba(100,220,140,0.3)' : 'rgba(255,255,255,0.1)', color: exportSelectedCount > 0 ? '#8fffb0' : 'rgba(255,255,255,0.4)' }}
+              style={{ ...s.addBtn, background: exportSelectedCount > 0 ? 'rgba(100,220,140,0.2)' : 'var(--surface-button)', borderColor: exportSelectedCount > 0 ? 'rgba(100,220,140,0.3)' : 'var(--border-strong)', color: exportSelectedCount > 0 ? '#8fffb0' : 'var(--text-muted)' }}
               onClick={() => { if (exportSelectedCount > 0) onOpenExportModal() }}
             >
               Export ({exportSelectedCount})
             </button>
             <button
-              style={{ ...s.addBtn, background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)' }}
+              style={{ ...s.addBtn, background: 'var(--surface-button)', borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }}
               onClick={onExitExportMode}
             >
               Cancel
@@ -63,10 +75,10 @@ export function HeaderBar({
           </div>
         ) : (
           <button
-            style={{ ...s.addBtn, background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}
+            style={{ ...s.addBtn, background: 'var(--surface-button)', borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }}
             onClick={onEnterExportMode}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-button-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
           >
             Export
           </button>

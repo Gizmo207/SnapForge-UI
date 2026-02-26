@@ -39,10 +39,10 @@ export function ExportModal({
         </div>
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>Selected Components</div>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-subtle)', marginBottom: 8 }}>Selected Components</div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
               {selectedItems.map((item) => (
-                <div key={item.path} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'rgba(140,130,255,0.12)', color: 'rgba(200,195,255,0.8)' }}>
+                <div key={item.path} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'var(--brand-bg)', color: 'var(--brand-text)' }}>
                   {getComponentLabel(item)}
                 </div>
               ))}
@@ -50,7 +50,7 @@ export function ExportModal({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.25)' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-subtle)' }}>
               Framework
             </div>
             <select
@@ -61,25 +61,26 @@ export function ExportModal({
                 width: 180,
                 padding: '6px 10px',
                 fontSize: 12,
-                background: 'rgba(255,255,255,0.06)',
+                background: 'var(--surface-input)',
+                color: 'var(--text-primary)',
               }}
             >
-              <option value="react">React</option>
-              <option value="html">HTML + CSS</option>
+              <option value="react" style={{ color: 'var(--text-primary)', background: 'var(--surface-modal)' }}>React</option>
+              <option value="html" style={{ color: 'var(--text-primary)', background: 'var(--surface-modal)' }}>HTML + CSS</option>
             </select>
           </div>
 
           {exportFramework === 'react' ? (
             <>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-subtle)', marginBottom: 8 }}>
                   react.tsx Bundle
                 </div>
                 <pre style={{ ...s.codeBlock, maxHeight: 220 }}><code>{reactBundle}</code></pre>
               </div>
 
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-subtle)', marginBottom: 8 }}>
                   Dependency Manifest ({manifest.summary.totalPackages} package{manifest.summary.totalPackages !== 1 ? 's' : ''})
                 </div>
                 <pre style={{ ...s.codeBlock, maxHeight: 200 }}><code>{manifestJSON}</code></pre>
@@ -102,14 +103,14 @@ export function ExportModal({
               )}
 
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-subtle)', marginBottom: 8 }}>
                   index.html ({htmlBundle.availableCount} component{htmlBundle.availableCount !== 1 ? 's' : ''})
                 </div>
                 <pre style={{ ...s.codeBlock, maxHeight: 200 }}><code>{htmlBundle.indexHtml}</code></pre>
               </div>
 
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: 'var(--text-subtle)', marginBottom: 8 }}>
                   styles.css
                 </div>
                 <pre style={{ ...s.codeBlock, maxHeight: 200 }}><code>{htmlBundle.stylesCss}</code></pre>
@@ -122,7 +123,7 @@ export function ExportModal({
               {downloadInProgress ? 'Preparing ZIP...' : 'Download ZIP'}
             </button>
             <button
-              style={{ ...s.submitBtn, background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}
+              style={{ ...s.submitBtn, background: 'var(--surface-button)', borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }}
               onClick={onDone}
             >
               Done

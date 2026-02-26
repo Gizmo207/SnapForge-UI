@@ -19,7 +19,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
     <div
       style={{
         ...s.card,
-        borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)',
+        borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? 'var(--border-strong)' : 'var(--border-subtle)',
         transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
         boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 12px 32px rgba(0,0,0,0.4)' : 'none',
       }}
@@ -31,8 +31,8 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
         <div style={{
           position: 'absolute' as const, top: 10, left: 10, zIndex: 3,
           width: 20, height: 20, borderRadius: 6,
-          border: exportChecked ? '2px solid rgba(100,220,140,0.8)' : '2px solid rgba(255,255,255,0.2)',
-          background: exportChecked ? 'rgba(100,220,140,0.3)' : 'rgba(0,0,0,0.4)',
+          border: exportChecked ? '2px solid rgba(100,220,140,0.8)' : '2px solid var(--border-strong)',
+          background: exportChecked ? 'rgba(100,220,140,0.3)' : 'var(--surface-code)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, color: '#8fffb0',
         }}>
@@ -54,7 +54,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
                 style={s.cardBtn}
                 onClick={onOpenPreview}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
               >
                 Preview
               </button>
@@ -62,7 +62,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
                 style={s.cardBtn}
                 onClick={onOpenCode}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
               >
                 Code
               </button>

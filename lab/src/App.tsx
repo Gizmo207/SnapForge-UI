@@ -1,4 +1,5 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
+import type React from 'react'
 import { registry, type RegistryItem } from './registry'
 import { buildDependencyManifest, formatManifestJSON } from './engine/dependencyGraph'
 import { HeaderBar } from './ui/HeaderBar'
@@ -21,6 +22,7 @@ import {
 const CATEGORY_ORDER = ['foundations', 'primitives', 'components', 'patterns', 'layouts', 'pages']
 
 function App() {
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSub, setSelectedSub] = useState<string | null>(null)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
@@ -36,6 +38,56 @@ function App() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportFramework, setExportFramework] = useState<ExportFramework>('react')
   const [exportDownloading, setExportDownloading] = useState(false)
+
+  const themeVars: React.CSSProperties = themeMode === 'dark'
+    ? {
+        '--surface-app': 'radial-gradient(circle at top left, #1a1a2e, #0f0f0f 60%)',
+        '--surface-header': 'rgba(15,15,15,0.7)',
+        '--surface-sidebar': 'rgba(15,15,15,0.5)',
+        '--surface-card': 'rgba(255,255,255,0.03)',
+        '--surface-preview': 'rgba(0,0,0,0.3)',
+        '--surface-overlay': 'rgba(0,0,0,0.7)',
+        '--surface-modal': 'rgba(18,18,22,0.97)',
+        '--surface-code': 'rgba(0,0,0,0.4)',
+        '--surface-input': 'rgba(255,255,255,0.04)',
+        '--surface-button': 'rgba(255,255,255,0.04)',
+        '--surface-button-hover': 'rgba(255,255,255,0.08)',
+        '--surface-pill': 'rgba(255,255,255,0.05)',
+        '--text-primary': '#ffffff',
+        '--text-secondary': 'rgba(255,255,255,0.7)',
+        '--text-muted': 'rgba(255,255,255,0.5)',
+        '--text-subtle': 'rgba(255,255,255,0.25)',
+        '--border-subtle': 'rgba(255,255,255,0.06)',
+        '--border-strong': 'rgba(255,255,255,0.1)',
+        '--brand-bg': 'rgba(140,130,255,0.15)',
+        '--brand-bg-hover': 'rgba(140,130,255,0.25)',
+        '--brand-border': 'rgba(140,130,255,0.3)',
+        '--brand-text': '#c4bfff',
+      } as React.CSSProperties
+    : {
+        '--surface-app': 'radial-gradient(circle at top left, #eef3ff, #f8fbff 60%)',
+        '--surface-header': 'rgba(255,255,255,0.88)',
+        '--surface-sidebar': 'rgba(255,255,255,0.78)',
+        '--surface-card': 'rgba(255,255,255,0.86)',
+        '--surface-preview': 'rgba(15,23,42,0.05)',
+        '--surface-overlay': 'rgba(15,23,42,0.35)',
+        '--surface-modal': 'rgba(255,255,255,0.98)',
+        '--surface-code': 'rgba(15,23,42,0.06)',
+        '--surface-input': 'rgba(15,23,42,0.04)',
+        '--surface-button': 'rgba(15,23,42,0.06)',
+        '--surface-button-hover': 'rgba(15,23,42,0.1)',
+        '--surface-pill': 'rgba(15,23,42,0.08)',
+        '--text-primary': '#0f172a',
+        '--text-secondary': 'rgba(15,23,42,0.78)',
+        '--text-muted': 'rgba(15,23,42,0.62)',
+        '--text-subtle': 'rgba(15,23,42,0.45)',
+        '--border-subtle': 'rgba(15,23,42,0.12)',
+        '--border-strong': 'rgba(15,23,42,0.2)',
+        '--brand-bg': 'rgba(79,70,229,0.14)',
+        '--brand-bg-hover': 'rgba(79,70,229,0.2)',
+        '--brand-border': 'rgba(79,70,229,0.3)',
+        '--brand-text': '#4338ca',
+      } as React.CSSProperties
 
   const structure = CATEGORY_ORDER.reduce<Record<string, string[]>>((acc, cat) => {
     const subs = new Set<string>()
@@ -127,7 +179,7 @@ function App() {
   }
 
   return (
-    <div style={s.app}>
+    <div style={{ ...s.app, ...themeVars, colorScheme: themeMode }}>
       <HeaderBar
         filteredCount={filtered.length}
         search={search}
@@ -145,20 +197,22 @@ function App() {
           setExportSelected(new Set())
         }}
         onEnterExportMode={() => setExportMode(true)}
+        themeMode={themeMode}
+        onToggleTheme={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
       />
 
       <div
         style={{
           padding: '14px 20px 10px',
           textAlign: 'center',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          background: 'rgba(255,255,255,0.01)',
+          borderBottom: '1px solid var(--border-subtle)',
+          background: 'var(--surface-input)',
         }}
       >
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
           Build once. Reuse everywhere.
         </div>
-        <div style={{ marginTop: 6, fontSize: 13, color: 'rgba(255,255,255,0.62)' }}>
+        <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
           SnapForge UI is a searchable library of reusable UI components you can preview, copy, and export into any project.
         </div>
       </div>
@@ -270,3 +324,4 @@ function App() {
 }
 
 export default App
+

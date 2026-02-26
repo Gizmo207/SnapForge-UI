@@ -34,8 +34,8 @@ export function DetailModal({
             <button
               style={{
                 ...s.modalTab,
-                background: !showCode ? 'rgba(140,130,255,0.15)' : 'rgba(255,255,255,0.05)',
-                borderColor: !showCode ? 'rgba(140,130,255,0.3)' : 'rgba(255,255,255,0.1)',
+                background: !showCode ? 'var(--brand-bg)' : 'var(--surface-input)',
+                borderColor: !showCode ? 'var(--brand-border)' : 'var(--border-strong)',
               }}
               onClick={onShowPreview}
             >
@@ -44,8 +44,8 @@ export function DetailModal({
             <button
               style={{
                 ...s.modalTab,
-                background: showCode ? 'rgba(140,130,255,0.15)' : 'rgba(255,255,255,0.05)',
-                borderColor: showCode ? 'rgba(140,130,255,0.3)' : 'rgba(255,255,255,0.1)',
+                background: showCode ? 'var(--brand-bg)' : 'var(--surface-input)',
+                borderColor: showCode ? 'var(--brand-border)' : 'var(--border-strong)',
               }}
               onClick={onShowCode}
             >
@@ -98,7 +98,7 @@ export function DetailModal({
                 <div style={s.metaLabel}>Dependencies</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 4 }}>
                   {item.meta?.dependencies?.map((d) => (
-                    <span key={d} style={{ ...s.metaTag, background: 'rgba(100,200,255,0.1)', color: 'rgba(150,220,255,0.8)' }}>{d}</span>
+                    <span key={d} style={{ ...s.metaTag, background: 'rgba(100,200,255,0.1)', color: 'var(--text-secondary)' }}>{d}</span>
                   ))}
                 </div>
               </div>

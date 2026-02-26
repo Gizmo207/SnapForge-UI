@@ -47,11 +47,11 @@ export function Sidebar({
           <div
             style={{
               ...s.catRow,
-              background: selectedCategory === cat && !selectedSub ? 'rgba(255,255,255,0.06)' : 'transparent',
-              color: selectedCategory === cat && !selectedSub ? '#fff' : 'rgba(255,255,255,0.5)',
+              background: selectedCategory === cat && !selectedSub ? 'var(--surface-pill)' : 'transparent',
+              color: selectedCategory === cat && !selectedSub ? 'var(--text-primary)' : 'var(--text-muted)',
             }}
             onMouseEnter={(e) => {
-              if (!(selectedCategory === cat && !selectedSub)) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+              if (!(selectedCategory === cat && !selectedSub)) e.currentTarget.style.background = 'var(--surface-input)'
             }}
             onMouseLeave={(e) => {
               if (!(selectedCategory === cat && !selectedSub)) e.currentTarget.style.background = 'transparent'
@@ -92,16 +92,16 @@ export function Sidebar({
             key={tag}
             style={{
               ...s.tagPill,
-              background: selectedTag === tag ? 'rgba(140,130,255,0.2)' : 'rgba(255,255,255,0.04)',
-              borderColor: selectedTag === tag ? 'rgba(140,130,255,0.4)' : 'rgba(255,255,255,0.08)',
-              color: selectedTag === tag ? '#c4bfff' : 'rgba(255,255,255,0.45)',
+              background: selectedTag === tag ? 'rgba(140,130,255,0.2)' : 'var(--surface-input)',
+              borderColor: selectedTag === tag ? 'rgba(140,130,255,0.4)' : 'var(--border-subtle)',
+              color: selectedTag === tag ? 'var(--brand-text)' : 'var(--text-muted)',
             }}
             onClick={() => onToggleTag(tag)}
             onMouseEnter={(e) => {
-              if (selectedTag !== tag) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+              if (selectedTag !== tag) e.currentTarget.style.background = 'var(--surface-button-hover)'
             }}
             onMouseLeave={(e) => {
-              if (selectedTag !== tag) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+              if (selectedTag !== tag) e.currentTarget.style.background = 'var(--surface-input)'
             }}
           >
             {tag}
@@ -132,13 +132,13 @@ function SidebarRow({ label, count, active, indent, onClick }: {
         fontWeight: 500,
         marginBottom: 2,
         transition: 'all 0.15s ease',
-        background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
-        color: active ? '#fff' : indent ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.5)',
+        background: active ? 'var(--surface-pill)' : 'transparent',
+        color: active ? 'var(--text-primary)' : indent ? 'var(--text-muted)' : 'var(--text-muted)',
         borderLeft: active ? '2px solid rgba(140,130,255,0.7)' : '2px solid transparent',
         textTransform: 'capitalize' as const,
       }}
       onClick={onClick}
-      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--surface-input)' }}
       onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent' }}
     >
       <span>{label}</span>
