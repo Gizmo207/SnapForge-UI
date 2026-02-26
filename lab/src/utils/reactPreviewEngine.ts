@@ -39,6 +39,7 @@ export function generateReactPreviewHtml(sourceCode: string): string {
       <meta charset="UTF-8" />
       <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
       <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+      <script src="https://unpkg.com/styled-components/dist/styled-components.min.js"></script>
       <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
       <style>
         body { margin: 0; padding: 16px; font-family: sans-serif; }
@@ -49,6 +50,7 @@ export function generateReactPreviewHtml(sourceCode: string): string {
 
       <script type="text/babel">
         const exports = {};
+        const styled = window.styled;
         ${safeSource}
         exports.default = ${exportTarget};
 
