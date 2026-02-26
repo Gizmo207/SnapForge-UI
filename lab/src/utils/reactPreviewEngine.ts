@@ -17,6 +17,7 @@ function getBasePreviewCss(): string {
     html, body, #preview-root {
       width: 100%;
       height: 100%;
+      min-height: 100%;
       margin: 0;
       padding: 0;
     }
@@ -25,6 +26,8 @@ function getBasePreviewCss(): string {
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
     .preview-canvas {
+      width: 100%;
+      height: 100%;
       min-height: 100%;
       display: flex;
       align-items: center;
@@ -34,15 +37,18 @@ function getBasePreviewCss(): string {
       box-sizing: border-box;
     }
     .preview-center {
-      display: inline-flex;
+      width: 100%;
+      height: 100%;
+      min-height: 160px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      max-width: 100%;
-      max-height: 100%;
       transform-origin: center;
     }
     .preview-center > * {
       max-width: 100%;
+      max-height: 100%;
+      margin: 0 auto;
     }
     .preview-theme-light .preview-canvas {
       background: #ffffff;
