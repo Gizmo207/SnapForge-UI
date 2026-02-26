@@ -9,8 +9,8 @@ import {
 } from '../utils/reactPreviewEngine'
 import { s } from './styles'
 
-const MIN_GALLERY_PREVIEW_HEIGHT = 180
-const MAX_GALLERY_PREVIEW_HEIGHT = 320
+const MIN_GALLERY_PREVIEW_HEIGHT = 220
+const MAX_GALLERY_PREVIEW_HEIGHT = 260
 
 type GalleryCardProps = {
   item: RegistryItem
@@ -86,6 +86,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
     <div
       style={{
         ...s.card,
+        cursor: exportMode ? 'pointer' : 'default',
         borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? 'var(--border-strong)' : 'var(--border-subtle)',
         transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
         boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 12px 32px rgba(0,0,0,0.4)' : 'none',
@@ -119,13 +120,11 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 10,
                 background: 'rgba(255,255,255,0.02)',
-                pointerEvents: 'none',
+                pointerEvents: exportMode ? 'none' : 'auto',
               }}
             />
             {previewClipped && !previewLoading && !previewError && (
-              <div style={s.previewClipFade}>
-                <span style={s.previewClipText}>Open Preview for full height</span>
-              </div>
+              <div style={s.previewClipFade} />
             )}
             {previewLoading && (
               <div style={s.previewOverlay}>

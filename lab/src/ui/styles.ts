@@ -126,8 +126,9 @@ const s: Record<string, React.CSSProperties> = {
     height: '60vh',
   },
   grid: {
-    columnWidth: 300,
-    columnGap: 20,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gap: 20,
   },
   card: {
     position: 'relative' as const,
@@ -137,12 +138,9 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid var(--border-subtle)',
     borderRadius: 14,
     overflow: 'hidden',
-    cursor: 'pointer',
+    cursor: 'default',
     transition: 'all 0.2s ease',
-    display: 'inline-block',
     width: '100%',
-    marginBottom: 20,
-    breakInside: 'avoid' as const,
   },
   cardPreview: {
     display: 'flex',
@@ -176,16 +174,8 @@ const s: Record<string, React.CSSProperties> = {
     height: 58,
     borderRadius: '0 0 10px 10px',
     background: 'linear-gradient(to top, rgba(8,10,14,0.86), rgba(8,10,14,0))',
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingBottom: 8,
+    display: 'block',
     pointerEvents: 'none' as const,
-  },
-  previewClipText: {
-    fontSize: 11,
-    color: 'rgba(240,240,255,0.78)',
-    letterSpacing: '0.02em',
   },
   previewSpinner: {
     width: 20,
