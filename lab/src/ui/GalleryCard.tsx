@@ -3,14 +3,13 @@ import type { RegistryItem } from '../registry'
 import {
   generateHtmlPreviewHtml,
   generateReactPreviewHtml,
+  inferPreviewTheme,
   isUnsafePreviewSource,
-  PREVIEW_RESIZE_EVENT,
   PREVIEW_STATUS_EVENT,
 } from '../utils/reactPreviewEngine'
 import { s } from './styles'
 
-const MIN_GALLERY_PREVIEW_HEIGHT = 220
-const MAX_GALLERY_PREVIEW_HEIGHT = 260
+const GALLERY_PREVIEW_FRAME_HEIGHT = 248
 
 type GalleryCardProps = {
   item: RegistryItem
@@ -23,7 +22,6 @@ type GalleryCardProps = {
 
 export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, onOpenPreview, onOpenCode }: GalleryCardProps) {
   const [hovered, setHovered] = useState(false)
-  const [iframeHeight, setIframeHeight] = useState(220)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const Component = item.component
@@ -32,15 +30,11 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(Component)
-  const effectivePreviewHeight = Math.max(
-    MIN_GALLERY_PREVIEW_HEIGHT,
-    Math.min(MAX_GALLERY_PREVIEW_HEIGHT, iframeHeight),
-  )
-  const previewClipped = iframeHeight > MAX_GALLERY_PREVIEW_HEIGHT
+  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '')
   const srcDoc = hasReactPreview
-    ? generateReactPreviewHtml(item.source || '', previewId)
+    ? generateReactPreviewHtml(item.source || '', previewId, previewTheme)
     : hasHtmlPreview
-      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId)
+      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId, previewTheme)
       : undefined
 
   useEffect(() => {
@@ -58,16 +52,10 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
       const data = event.data as {
         type?: string
         previewId?: string
-        height?: number
         status?: string
         message?: string
       } | undefined
       if (!data || data.previewId !== previewId) return
-
-      if (data.type === PREVIEW_RESIZE_EVENT && typeof data.height === 'number' && Number.isFinite(data.height)) {
-        setIframeHeight(Math.max(120, Math.ceil(data.height)))
-        return
-      }
 
       if (data.type === PREVIEW_STATUS_EVENT) {
         if (data.status === 'ready') setPreviewLoading(false)
@@ -88,7 +76,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
         ...s.card,
         cursor: exportMode ? 'pointer' : 'default',
         borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? 'var(--border-strong)' : 'var(--border-subtle)',
-        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        transform: hovered ? 'translateY(-3px) scale(1.008)' : 'translateY(0) scale(1)',
         boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 12px 32px rgba(0,0,0,0.4)' : 'none',
       }}
       onMouseEnter={() => setHovered(true)}
@@ -107,7 +95,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
           {exportChecked ? '✓' : ''}
         </div>
       )}
-      <div style={{ ...s.cardPreview, padding: srcDoc ? 12 : 0, height: srcDoc ? effectivePreviewHeight + 24 : s.cardPreview.height }}>
+      <div style={{ ...s.cardPreview, padding: srcDoc ? 12 : 0, height: srcDoc ? GALLERY_PREVIEW_FRAME_HEIGHT + 24 : s.cardPreview.height }}>
         {srcDoc ? (
           <>
             <iframe
@@ -116,16 +104,14 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
               srcDoc={srcDoc}
               style={{
                 width: '100%',
-                height: effectivePreviewHeight,
+                height: GALLERY_PREVIEW_FRAME_HEIGHT,
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 10,
-                background: 'rgba(255,255,255,0.02)',
-                pointerEvents: exportMode ? 'none' : 'auto',
+                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+                background: previewTheme === 'light' ? '#ffffff' : previewTheme === 'dark' ? '#0f1117' : '#e5e7eb',
+                pointerEvents: exportMode || previewLoading || Boolean(previewError) ? 'none' : 'auto',
               }}
             />
-            {previewClipped && !previewLoading && !previewError && (
-              <div style={s.previewClipFade} />
-            )}
             {previewLoading && (
               <div style={s.previewOverlay}>
                 <div style={s.previewSpinner} />

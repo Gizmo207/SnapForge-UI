@@ -3,6 +3,7 @@ import type { RegistryItem } from '../../registry'
 import {
   generateHtmlPreviewHtml,
   generateReactPreviewHtml,
+  inferPreviewTheme,
   isUnsafePreviewSource,
   PREVIEW_RESIZE_EVENT,
   PREVIEW_STATUS_EVENT,
@@ -38,10 +39,11 @@ export function DetailModal({
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(item.component)
+  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '')
   const srcDoc = hasReactPreview
-    ? generateReactPreviewHtml(item.source || '', previewId)
+    ? generateReactPreviewHtml(item.source || '', previewId, previewTheme)
     : hasHtmlPreview
-      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId)
+      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId, previewTheme)
       : undefined
 
   useEffect(() => {
