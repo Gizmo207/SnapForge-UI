@@ -1,4 +1,10 @@
-const FILE_SERVICE_URL = 'http://localhost:3001'
+const FILE_SERVICE_URL = import.meta.env.VITE_API_BASE_URL
+
+console.log('PROD API BASE:', FILE_SERVICE_URL)
+
+if (!FILE_SERVICE_URL) {
+  throw new Error('VITE_API_BASE_URL missing in production build')
+}
 type ExportFramework = 'react' | 'html'
 
 type ExportZipComponent = {
