@@ -29,7 +29,9 @@ export function HeaderBar({
 }: HeaderBarProps) {
   return (
     <div style={s.header}>
-      <div style={s.logo}>UI Lab</div>
+      <div style={s.logo}>
+        <img src="/logo.png" alt="SnapForge UI" style={s.logoImage} />
+      </div>
       <div style={s.searchWrap}>
         <input
           placeholder="Search components..."

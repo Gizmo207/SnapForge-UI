@@ -21,7 +21,17 @@ const s: Record<string, React.CSSProperties> = {
     zIndex: 40,
     gap: 16,
   },
-  logo: { fontWeight: 700, fontSize: 16, letterSpacing: '-0.02em', flexShrink: 0 },
+  logo: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  logoImage: {
+    height: 28,
+    width: 'auto',
+    display: 'block',
+    objectFit: 'contain' as const,
+  },
   searchWrap: { flex: 1, display: 'flex', justifyContent: 'center' },
   searchInput: {
     width: 340,
