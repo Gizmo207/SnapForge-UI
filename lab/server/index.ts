@@ -18,7 +18,7 @@ const PORT = Number(process.env.PORT) || 3001;
 app.use(cors());
 app.use(express.json());
 
-app.get('/components', (_req, res) => {
+const handleListComponents: express.RequestHandler = (_req, res) => {
   try {
     const items = listComponents();
     res.json({ success: true, items });
@@ -28,7 +28,18 @@ app.get('/components', (_req, res) => {
       message: err instanceof Error ? err.message : 'Failed to load components',
     });
   }
+};
+
+app.get('/', (_req, res) => {
+  res.json({ success: true, service: 'snapforge-file-service' });
 });
+
+app.get('/health', (_req, res) => {
+  res.json({ success: true, status: 'ok' });
+});
+
+app.get('/components', handleListComponents);
+app.get('/api/components', handleListComponents);
 
 app.post('/save-component', (req, res) => {
   const { name, code, htmlSource, cssSource, framework, category, subcategory, tags, dependencies } = req.body;

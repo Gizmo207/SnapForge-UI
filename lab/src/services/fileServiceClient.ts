@@ -67,18 +67,29 @@ export async function saveComponent(payload: SavePayload) {
 }
 
 export async function fetchComponents(): Promise<RegistryItem[]> {
-  const res = await fetch(`${FILE_SERVICE_URL}/components`)
-  const data = await parseJsonResponse(res)
-  const items = (data.items || []) as ComponentCatalogItem[]
-  return items.map((item) => ({
-    path: item.path,
-    componentDir: item.componentDir,
-    component: undefined,
-    source: item.source,
-    htmlSource: item.htmlSource,
-    cssSource: item.cssSource,
-    meta: item.meta,
-  }))
+  const endpoints = [`${FILE_SERVICE_URL}/components`, `${FILE_SERVICE_URL}/api/components`]
+  let lastError: Error | null = null
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint)
+      const data = await parseJsonResponse(res)
+      const items = (data.items || []) as ComponentCatalogItem[]
+      return items.map((item) => ({
+        path: item.path,
+        componentDir: item.componentDir,
+        component: undefined,
+        source: item.source,
+        htmlSource: item.htmlSource,
+        cssSource: item.cssSource,
+        meta: item.meta,
+      }))
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error('Failed to fetch components')
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch components')
 }
 
 export async function deleteComponent(filePath: string) {
