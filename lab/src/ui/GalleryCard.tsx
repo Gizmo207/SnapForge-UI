@@ -130,41 +130,35 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
         ) : (
           <div style={{ opacity: 0.45, fontSize: 12 }}>Preview unavailable</div>
         )}
-      </div>
-      <div style={s.cardInfo}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={s.cardTitle}>{item.meta?.name}</div>
-            <div style={s.itemMeta}>{item.meta?.category} {item.meta?.subcategory && `/ ${item.meta.subcategory}`}</div>
-          </div>
-          {hovered && !exportMode && (
-            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-              {hasPreview && (
-                <button
-                  style={s.cardBtn}
-                  onClick={onOpenPreview}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.2)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
-                >
-                  Preview
-                </button>
-              )}
+        {hovered && !exportMode && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 18,
+              right: 18,
+              display: 'flex',
+              gap: 6,
+              zIndex: 5,
+            }}
+          >
+            {hasPreview && (
               <button
                 style={s.cardBtn}
-                onClick={onOpenCode}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.2)' }}
+                onClick={onOpenPreview}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.22)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
               >
-                Code
+                Preview
               </button>
-            </div>
-          )}
-        </div>
-        {item.meta?.tags && (
-          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap' as const, gap: 4 }}>
-            {item.meta.tags.slice(0, 3).map((t) => (
-              <span key={t} style={s.cardTag}>{t}</span>
-            ))}
+            )}
+            <button
+              style={s.cardBtn}
+              onClick={onOpenCode}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,130,255,0.22)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
+            >
+              Code
+            </button>
           </div>
         )}
       </div>
