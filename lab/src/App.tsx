@@ -20,6 +20,7 @@ import {
 } from './pure/exportBundles'
 
 const CATEGORY_ORDER = ['foundations', 'primitives', 'components', 'patterns', 'layouts', 'pages']
+const MAX_VISIBLE_TAGS = 12
 
 function App() {
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark')
@@ -112,7 +113,20 @@ function App() {
     return acc
   }, {})
 
-  const allTags = Array.from(new Set(registryItems.flatMap((item) => item.meta?.tags || []))).sort()
+  const tagCounts = registryItems.reduce<Record<string, number>>((acc, item) => {
+    for (const tag of item.meta?.tags || []) {
+      acc[tag] = (acc[tag] || 0) + 1
+    }
+    return acc
+  }, {})
+
+  const allTags = Object.entries(tagCounts)
+    .sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1]
+      return a[0].localeCompare(b[0])
+    })
+    .slice(0, MAX_VISIBLE_TAGS)
+    .map(([tag]) => tag)
 
   const countFor = (cat: string, sub?: string) =>
     registryItems.filter((item) => item.meta?.category === cat && (sub ? item.meta?.subcategory === sub : true)).length
