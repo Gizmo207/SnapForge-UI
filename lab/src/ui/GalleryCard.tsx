@@ -9,6 +9,9 @@ import {
 } from '../utils/reactPreviewEngine'
 import { s } from './styles'
 
+const MIN_GALLERY_PREVIEW_HEIGHT = 180
+const MAX_GALLERY_PREVIEW_HEIGHT = 320
+
 type GalleryCardProps = {
   item: RegistryItem
   exportMode?: boolean
@@ -29,6 +32,11 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(Component)
+  const effectivePreviewHeight = Math.max(
+    MIN_GALLERY_PREVIEW_HEIGHT,
+    Math.min(MAX_GALLERY_PREVIEW_HEIGHT, iframeHeight),
+  )
+  const previewClipped = iframeHeight > MAX_GALLERY_PREVIEW_HEIGHT
   const srcDoc = hasReactPreview
     ? generateReactPreviewHtml(item.source || '', previewId)
     : hasHtmlPreview
@@ -98,7 +106,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
           {exportChecked ? '✓' : ''}
         </div>
       )}
-      <div style={{ ...s.cardPreview, padding: srcDoc ? 12 : 0, height: srcDoc ? Math.max(180, iframeHeight + 24) : s.cardPreview.height }}>
+      <div style={{ ...s.cardPreview, padding: srcDoc ? 12 : 0, height: srcDoc ? effectivePreviewHeight + 24 : s.cardPreview.height }}>
         {srcDoc ? (
           <>
             <iframe
@@ -107,13 +115,18 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
               srcDoc={srcDoc}
               style={{
                 width: '100%',
-                height: iframeHeight,
+                height: effectivePreviewHeight,
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 10,
                 background: 'rgba(255,255,255,0.02)',
                 pointerEvents: 'none',
               }}
             />
+            {previewClipped && !previewLoading && !previewError && (
+              <div style={s.previewClipFade}>
+                <span style={s.previewClipText}>Open Preview for full height</span>
+              </div>
+            )}
             {previewLoading && (
               <div style={s.previewOverlay}>
                 <div style={s.previewSpinner} />
