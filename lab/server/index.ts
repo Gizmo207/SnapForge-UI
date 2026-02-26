@@ -116,8 +116,8 @@ app.post('/export-zip', (req, res) => {
   exportZipToResponse(req.body, res);
 });
 
-app.listen(PORT, () => {
-  console.log(`File service running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`File service running on port ${PORT}`);
 });
 
 process.on('uncaughtException', (err) => {
