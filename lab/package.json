@@ -9,13 +9,15 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
-    "update-tsconfig": "node scripts/updateTsconfig.js"
+    "update-tsconfig": "node scripts/updateTsconfig.js",
+    "backfill:db": "tsx scripts/backfillComponentsToDb.ts"
   },
   "dependencies": {
     "@babel/parser": "^7.29.0",
     "archiver": "^7.0.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "pg": "^8.19.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "styled-components": "^6.3.11",
@@ -27,6 +29,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.0",
+    "@types/pg": "^8.16.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/styled-components": "^5.1.36",

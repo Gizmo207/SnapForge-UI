@@ -1,16 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { saveComponent, deleteComponent, listComponents } from './fileService.js';
-import { sanitizeFile } from './sanitizeService.js';
-import { parseCheckFile } from './parseCheckService.js';
+import { saveComponent, deleteComponent, listComponents, postprocessComponent, initStore } from './fileService.js';
 import { exportZipToResponse } from './exportZipService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const REGISTRY_PATH = path.resolve(__dirname, '..', 'src', 'registry.ts');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -18,9 +9,9 @@ const PORT = Number(process.env.PORT) || 3001;
 app.use(cors());
 app.use(express.json());
 
-const handleListComponents: express.RequestHandler = (_req, res) => {
+const handleListComponents: express.RequestHandler = async (_req, res) => {
   try {
-    const items = listComponents();
+    const items = await listComponents();
     res.json({ success: true, items });
   } catch (err: unknown) {
     res.status(500).json({
@@ -41,7 +32,7 @@ app.get('/health', (_req, res) => {
 app.get('/components', handleListComponents);
 app.get('/api/components', handleListComponents);
 
-app.post('/save-component', (req, res) => {
+app.post('/save-component', async (req, res) => {
   const { name, code, htmlSource, cssSource, framework, category, subcategory, tags, dependencies } = req.body;
 
   if (!name || !code || !category || !subcategory) {
@@ -53,7 +44,7 @@ app.post('/save-component', (req, res) => {
     return;
   }
 
-  const result = saveComponent({
+  const result = await saveComponent({
     name,
     code,
     htmlSource,
@@ -66,15 +57,19 @@ app.post('/save-component', (req, res) => {
   });
 
   if (result.success) {
-    // Touch registry.ts to force Vite to invalidate its glob cache
-    const now = new Date();
-    fs.utimesSync(REGISTRY_PATH, now, now);
+    res.status(200).json(result);
+    return;
   }
 
-  res.status(result.success ? 200 : 409).json(result);
+  if (result.status === 'duplicate') {
+    res.status(409).json(result);
+    return;
+  }
+
+  res.status(500).json(result);
 });
 
-app.delete('/delete-component', (req, res) => {
+app.delete('/delete-component', async (req, res) => {
   const { filePath } = req.body;
 
   if (!filePath) {
@@ -82,17 +77,12 @@ app.delete('/delete-component', (req, res) => {
     return;
   }
 
-  const result = deleteComponent(filePath);
-
-  if (result.success) {
-    const now = new Date();
-    fs.utimesSync(REGISTRY_PATH, now, now);
-  }
+  const result = await deleteComponent(filePath);
 
   res.status(result.success ? 200 : 404).json(result);
 });
 
-app.post('/api/postprocess-component', (req, res) => {
+app.post('/api/postprocess-component', async (req, res) => {
   const { filePath } = req.body;
 
   if (!filePath) {
@@ -100,15 +90,26 @@ app.post('/api/postprocess-component', (req, res) => {
     return;
   }
 
-  const sanitizeResult = sanitizeFile(filePath);
-  const parseResult = parseCheckFile(filePath);
+  const result = await postprocessComponent(filePath);
+
+  if (!result.found) {
+    res.status(404).json({
+      success: false,
+      message: `File not found: ${filePath}`,
+      sanitized: false,
+      appliedRules: [],
+      parseOk: false,
+      parseErrors: result.parseResult.parseErrors,
+    });
+    return;
+  }
 
   res.json({
     success: true,
-    sanitized: sanitizeResult.sanitized,
-    appliedRules: sanitizeResult.appliedRules,
-    parseOk: parseResult.parseOk,
-    parseErrors: parseResult.parseErrors,
+    sanitized: result.sanitized,
+    appliedRules: result.appliedRules,
+    parseOk: result.parseResult.parseOk,
+    parseErrors: result.parseResult.parseErrors,
   });
 });
 
@@ -116,8 +117,16 @@ app.post('/export-zip', (req, res) => {
   exportZipToResponse(req.body, res);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`File service running on port ${PORT}`);
+async function start() {
+  await initStore();
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`File service running on port ${PORT}`);
+  });
+}
+
+void start().catch((err) => {
+  console.error('Failed to initialize backend:', err);
+  process.exit(1);
 });
 
 process.on('uncaughtException', (err) => {

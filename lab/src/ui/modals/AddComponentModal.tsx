@@ -3,7 +3,7 @@ import type React from 'react'
 import { parseComponent } from '../../parser/parseComponent'
 import { ValidationBadge, ValidationPanel, type PostprocessResult } from '../../components/ValidationStatus'
 import { copyToClipboard } from '../../services/clipboardService'
-import { postprocessComponent, saveComponent } from '../../services/fileServiceClient'
+import { ApiError, postprocessComponent, saveComponent } from '../../services/fileServiceClient'
 import { isUnsafePreviewSource } from '../../utils/reactPreviewEngine'
 import { s } from '../styles'
 
@@ -72,6 +72,16 @@ function AddComponentForm({
       showToast(`Saved to ${result.relativePath}`, 'success')
       relativePath = result.relativePath
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409) {
+        const data = typeof err.data === 'object' && err.data ? err.data as { errorCode?: string } : {}
+        const duplicateCode = data.errorCode === 'DUPLICATE_SLUG' || err.message.toLowerCase().includes('already exists')
+        if (duplicateCode) {
+          showToast('A component with that name already exists in this category. Rename it and save again.', 'error')
+          setSaving(false)
+          return
+        }
+      }
+
       showToast(err instanceof Error ? err.message : 'Save failed', 'error')
       setSaving(false)
       return

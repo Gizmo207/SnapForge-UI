@@ -1,16 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const TEMPLATES_ROOT = path.resolve(__dirname, '..', '..');
-const TSCONFIG_PATH = path.join(TEMPLATES_ROOT, 'tsconfig.json');
-
-console.log('__dirname:', __dirname);
-console.log('TEMPLATES_ROOT:', TEMPLATES_ROOT);
-
-const CATEGORIES = ['primitives', 'components', 'patterns', 'layouts', 'pages', 'foundations'];
+import { Pool } from 'pg';
+import { sanitize } from '../src/engine/sanitizer/sanitize.js';
+import { parseCheck } from '../src/engine/parser/parseCheck.js';
+import type { ParseCheckResult } from '../src/engine/parser/types.js';
 
 export type SaveRequest = {
   name: string;
@@ -30,6 +21,7 @@ export type SaveResult = {
   relativePath: string;
   status: 'created' | 'duplicate' | 'error';
   message: string;
+  errorCode?: 'DUPLICATE_SLUG' | 'UNKNOWN';
 };
 
 type ComponentMeta = {
@@ -50,31 +42,73 @@ export type ComponentCatalogItem = {
   meta?: ComponentMeta;
 };
 
-const SCAN_ROOTS = ['primitives', 'components', 'templates', 'patterns', 'layouts', 'pages', 'foundations'];
+const DATABASE_URL = process.env.DATABASE_URL;
 
-function updateTsconfig() {
-  console.log('updateTsconfig called');
-  console.log('TSCONFIG_PATH:', TSCONFIG_PATH);
-  console.log('File exists:', fs.existsSync(TSCONFIG_PATH));
-  
-  const patterns: string[] = [];
-  
-  for (const category of CATEGORIES) {
-    const categoryPath = path.join(TEMPLATES_ROOT, category);
-    if (fs.existsSync(categoryPath)) {
-      patterns.push(`${category}/**/*.tsx`);
-    }
-  }
-  
-  // Read current tsconfig
-  console.log('Attempting to read tsconfig...');
-  const tsconfig = JSON.parse(fs.readFileSync(TSCONFIG_PATH, 'utf-8'));
-  tsconfig.include = patterns;
-  
-  // Write back
-  console.log('Writing tsconfig...');
-  fs.writeFileSync(TSCONFIG_PATH, JSON.stringify(tsconfig, null, 2));
-  console.log('tsconfig updated with patterns:', patterns);
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL is required for component storage');
+}
+
+const useSsl = !/localhost|127\.0\.0\.1/i.test(DATABASE_URL);
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+});
+
+let initPromise: Promise<void> | null = null;
+
+export async function initStore(): Promise<void> {
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS components (
+        id BIGSERIAL PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        subcategory TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'react',
+        tags TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+        dependencies TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+        source TEXT NOT NULL,
+        html_source TEXT,
+        css_source TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_components_category_subcategory
+      ON components (category, subcategory);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_components_created_at
+      ON components (created_at DESC);
+    `);
+
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION set_components_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    await pool.query(`
+      DROP TRIGGER IF EXISTS trg_components_updated_at ON components;
+      CREATE TRIGGER trg_components_updated_at
+      BEFORE UPDATE ON components
+      FOR EACH ROW
+      EXECUTE FUNCTION set_components_updated_at();
+    `);
+  })();
+
+  return initPromise;
 }
 
 function normalizeName(name: string): string {
@@ -82,7 +116,9 @@ function normalizeName(name: string): string {
     .replace(/([a-z])([A-Z])/g, '$1-$2')
     .replace(/[\s_]+/g, '-')
     .replace(/[^a-zA-Z0-9-]/g, '')
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 function generateMeta(req: SaveRequest): string {
@@ -139,7 +175,7 @@ function wrapCode(req: SaveRequest): string {
 
   const { imports, body } = extractImports(req.code);
   const hasDefault = req.code.includes('export default');
-  const componentName = req.name.replace(/[^a-zA-Z0-9]/g, '');
+  const componentName = req.name.replace(/[^a-zA-Z0-9]/g, '') || 'Component';
 
   let result = '';
   if (imports) result += imports + '\n\n';
@@ -150,86 +186,147 @@ function wrapCode(req: SaveRequest): string {
   return result;
 }
 
-export function deleteComponent(filePath: string): { success: boolean; message: string } {
-  console.log('Delete request for filePath:', filePath);
-  // Convert forward slashes to backslashes for Windows
-  const normalizedPath = filePath.replace(/\//g, path.sep);
-  const fullPath = path.join(TEMPLATES_ROOT, normalizedPath);
-  console.log('Normalized path:', normalizedPath);
-  console.log('Resolved fullPath:', fullPath);
-  console.log('File exists:', fs.existsSync(fullPath));
+function normalizeArray(values: string[] | undefined): string[] {
+  if (!Array.isArray(values)) return [];
+  return values
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
 
-  if (!fullPath.startsWith(TEMPLATES_ROOT)) {
+function normalizeSegment(value: string, fallback: string): string {
+  const normalized = normalizeName(value);
+  return normalized || fallback;
+}
+
+function normalizeRelativePath(filePath: string): string {
+  return filePath
+    .replace(/\\/g, '/')
+    .replace(/^(\.\.\/)+/g, '')
+    .replace(/^\.?\//, '')
+    .replace(/\/+/g, '/');
+}
+
+function slugFromFilePath(filePath: string): string {
+  const normalized = normalizeRelativePath(filePath);
+  if (normalized.endsWith('/react.tsx')) {
+    return normalized.slice(0, -'/react.tsx'.length);
+  }
+  return normalized;
+}
+
+type DbComponentRow = {
+  slug: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  type: string;
+  tags: string[];
+  dependencies: string[];
+  source: string;
+  html_source: string | null;
+  css_source: string | null;
+};
+
+function mapRowToCatalogItem(row: DbComponentRow): ComponentCatalogItem {
+  return {
+    path: `${row.slug}/react.tsx`,
+    componentDir: row.slug,
+    source: row.source,
+    htmlSource: row.html_source ?? undefined,
+    cssSource: row.css_source ?? undefined,
+    meta: {
+      name: row.name,
+      category: row.category,
+      subcategory: row.subcategory,
+      type: row.type,
+      tags: row.tags ?? [],
+      dependencies: row.dependencies ?? [],
+    },
+  };
+}
+
+export async function deleteComponent(filePath: string): Promise<{ success: boolean; message: string }> {
+  await initStore();
+
+  const slug = slugFromFilePath(filePath);
+  if (!slug || slug.includes('..')) {
     return { success: false, message: 'Invalid path' };
   }
 
-  if (!fs.existsSync(fullPath)) {
-    return { success: false, message: `File not found: ${filePath}` };
-  }
-
   try {
-    const isReactEntry = path.basename(fullPath).toLowerCase() === 'react.tsx';
-    const removedPath = isReactEntry ? path.dirname(fullPath) : fullPath;
+    const result = await pool.query<{ slug: string }>(
+      'DELETE FROM components WHERE slug = $1 RETURNING slug',
+      [slug],
+    );
 
-    if (isReactEntry) {
-      fs.rmSync(removedPath, { recursive: true });
-    } else {
-      fs.unlinkSync(removedPath);
+    if (result.rowCount === 0) {
+      return { success: false, message: `File not found: ${filePath}` };
     }
 
-    // Clean up empty parent directories
-    let dir = path.dirname(removedPath);
-    while (dir !== TEMPLATES_ROOT && fs.existsSync(dir)) {
-      const contents = fs.readdirSync(dir);
-      if (contents.length === 0) {
-        fs.rmdirSync(dir);
-        dir = path.dirname(dir);
-      } else {
-        break;
-      }
-    }
-
-    // Update tsconfig after deletion
-    updateTsconfig();
-    
-    return { success: true, message: `Deleted ${filePath}` };
+    return { success: true, message: `Deleted ${normalizeRelativePath(filePath)}` };
   } catch (err: unknown) {
     return { success: false, message: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
 
-export function saveComponent(req: SaveRequest): SaveResult {
-  const detectedFramework = detectFramework(req.code);
-  const fileName = normalizeName(req.name);
-  const dirPath = path.join(TEMPLATES_ROOT, req.category, req.subcategory, fileName);
-  const filePath = path.join(dirPath, 'react.tsx');
-  const relativePath = path.relative(TEMPLATES_ROOT, filePath).replace(/\\/g, '/');
+export async function saveComponent(req: SaveRequest): Promise<SaveResult> {
+  await initStore();
 
-  console.log(`Save request: ${req.name} -> ${fileName}/react.tsx`);
-  console.log(`Target path: ${filePath}`);
-  console.log(`File exists: ${fs.existsSync(filePath)}`);
+  const detectedFramework = detectFramework(req.code);
+  const category = normalizeSegment(req.category, 'components');
+  const subcategory = normalizeSegment(req.subcategory, 'misc');
+  const name = req.name.trim() || 'Component';
+  const fileName = normalizeName(name) || 'component';
+  const componentDir = `${category}/${subcategory}/${fileName}`;
+  const relativePath = `${componentDir}/react.tsx`;
+  const filePath = relativePath;
 
   try {
-    console.log('Attempting to save...');
-    fs.mkdirSync(dirPath, { recursive: true });
+    const finalCode = wrapCode({
+      ...req,
+      name,
+      category,
+      subcategory,
+      framework: detectedFramework,
+      tags: normalizeArray(req.tags),
+      dependencies: normalizeArray(req.dependencies),
+    });
 
-    const finalCode = wrapCode({ ...req, framework: detectedFramework });
-    console.log('Code wrapped, writing file...');
-    fs.writeFileSync(filePath, finalCode, 'utf-8');
+    const result = await pool.query<{ slug: string }>(
+      `
+      INSERT INTO components (
+        slug, name, category, subcategory, type,
+        tags, dependencies, source, html_source, css_source
+      )
+      VALUES ($1, $2, $3, $4, $5, $6::text[], $7::text[], $8, $9, $10)
+      ON CONFLICT (slug) DO NOTHING
+      RETURNING slug
+      `,
+      [
+        componentDir,
+        name,
+        category,
+        subcategory,
+        detectedFramework,
+        normalizeArray(req.tags),
+        normalizeArray(req.dependencies),
+        finalCode,
+        detectedFramework === 'html' && req.htmlSource?.trim() ? req.htmlSource : null,
+        detectedFramework === 'html' && req.cssSource?.trim() ? req.cssSource : null,
+      ],
+    );
 
-    if (detectedFramework === 'html' && req.htmlSource && req.htmlSource.trim()) {
-      fs.writeFileSync(path.join(dirPath, 'html.html'), req.htmlSource, 'utf-8');
+    if (result.rowCount === 0) {
+      return {
+        success: false,
+        filePath,
+        relativePath,
+        status: 'duplicate',
+        message: `A component with this slug already exists (${componentDir}). Rename it and try again.`,
+        errorCode: 'DUPLICATE_SLUG',
+      };
     }
-
-    if (detectedFramework === 'html' && req.cssSource && req.cssSource.trim()) {
-      fs.writeFileSync(path.join(dirPath, 'styles.css'), req.cssSource, 'utf-8');
-    }
-
-    console.log('File written successfully!');
-    
-    // Update tsconfig after save
-    // updateTsconfig(); // Temporarily disabled to fix save issue
-    console.log('tsconfig updated');
 
     return {
       success: true,
@@ -239,133 +336,85 @@ export function saveComponent(req: SaveRequest): SaveResult {
       message: `Saved to ${relativePath}`,
     };
   } catch (err: unknown) {
-    console.log('Error during save:', err);
     return {
       success: false,
       filePath,
       relativePath,
       status: 'error',
       message: err instanceof Error ? err.message : 'Unknown error',
+      errorCode: 'UNKNOWN',
     };
   }
 }
 
-function readTextIfExists(filePath: string): string | undefined {
-  if (!fs.existsSync(filePath)) return undefined;
-  return fs.readFileSync(filePath, 'utf-8');
+export async function listComponents(): Promise<ComponentCatalogItem[]> {
+  await initStore();
+
+  const result = await pool.query<DbComponentRow>(`
+    SELECT
+      slug, name, category, subcategory, type,
+      tags, dependencies, source, html_source, css_source
+    FROM components
+    ORDER BY created_at DESC, id DESC
+  `);
+
+  return result.rows.map(mapRowToCatalogItem);
 }
 
-function titleFromSlug(slug: string): string {
-  return slug
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+type ComponentSourceRecord = {
+  id: number;
+  source: string;
+};
+
+async function getComponentSource(filePath: string): Promise<ComponentSourceRecord | null> {
+  await initStore();
+
+  const slug = slugFromFilePath(filePath);
+  if (!slug || slug.includes('..')) return null;
+
+  const result = await pool.query<ComponentSourceRecord>(
+    'SELECT id, source FROM components WHERE slug = $1',
+    [slug],
+  );
+
+  return result.rows[0] ?? null;
 }
 
-function parseMetaFromSource(source: string): ComponentMeta | undefined {
-  const metaBlockMatch = source.match(/export\s+const\s+meta\s*=\s*\{([\s\S]*?)\}\s*;?/m);
-  if (!metaBlockMatch) return undefined;
-  const block = metaBlockMatch[1];
+export type PostprocessServiceResult = {
+  found: boolean;
+  sanitized: boolean;
+  appliedRules: string[];
+  parseResult: ParseCheckResult;
+};
 
-  const readString = (field: string): string | undefined => {
-    const match = block.match(new RegExp(`${field}\\s*:\\s*["'\`]([^"'\`]+)["'\`]`, 'm'));
-    return match?.[1];
-  };
-
-  const readArray = (field: string): string[] => {
-    const match = block.match(new RegExp(`${field}\\s*:\\s*\\[([\\s\\S]*?)\\]`, 'm'));
-    if (!match) return [];
-    const items: string[] = [];
-    const re = /["'`]([^"'`]+)["'`]/g;
-    let entry: RegExpExecArray | null;
-    entry = re.exec(match[1]);
-    while (entry) {
-      items.push(entry[1]);
-      entry = re.exec(match[1]);
-    }
-    return items;
-  };
-
-  const name = readString('name');
-  const category = readString('category');
-  const subcategory = readString('subcategory');
-  const type = readString('type') ?? 'react';
-
-  if (!name || !category || !subcategory) return undefined;
-
-  return {
-    name,
-    category,
-    subcategory,
-    type,
-    tags: readArray('tags'),
-    dependencies: readArray('dependencies'),
-  };
-}
-
-function inferMetaFromPath(relativePath: string): ComponentMeta {
-  const parts = relativePath.split('/');
-  const category = parts[0] || 'components';
-  const subcategory = parts[1] || 'misc';
-  const componentSlug = parts[2] || path.basename(path.dirname(relativePath));
-
-  return {
-    name: titleFromSlug(componentSlug),
-    category,
-    subcategory,
-    type: 'react',
-    tags: [],
-    dependencies: [],
-  };
-}
-
-function walkReactEntries(dirPath: string, out: string[]) {
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      walkReactEntries(fullPath, out);
-      continue;
-    }
-    if (entry.isFile() && entry.name === 'react.tsx') {
-      out.push(fullPath);
-    }
-  }
-}
-
-export function listComponents(): ComponentCatalogItem[] {
-  const reactEntries: string[] = [];
-
-  for (const root of SCAN_ROOTS) {
-    const rootPath = path.join(TEMPLATES_ROOT, root);
-    if (!fs.existsSync(rootPath)) continue;
-    walkReactEntries(rootPath, reactEntries);
-  }
-
-  const items = reactEntries.map((filePath) => {
-    const pathRel = path.relative(TEMPLATES_ROOT, filePath).replace(/\\/g, '/');
-    const componentDir = pathRel.replace(/\/react\.tsx$/, '');
-    const source = fs.readFileSync(filePath, 'utf-8');
-    const htmlSource = readTextIfExists(path.join(TEMPLATES_ROOT, componentDir, 'html.html'));
-    const cssSource = readTextIfExists(path.join(TEMPLATES_ROOT, componentDir, 'styles.css'));
-    const meta = parseMetaFromSource(source) ?? inferMetaFromPath(pathRel);
-
+export async function postprocessComponent(filePath: string): Promise<PostprocessServiceResult> {
+  const record = await getComponentSource(filePath);
+  if (!record) {
     return {
-      path: pathRel,
-      componentDir,
-      source,
-      htmlSource,
-      cssSource,
-      meta,
+      found: false,
+      sanitized: false,
+      appliedRules: [],
+      parseResult: {
+        parseOk: false,
+        parseErrors: [{ message: `File not found: ${filePath}`, line: null, column: null }],
+      },
     };
-  });
+  }
 
-  items.sort((a, b) => {
-    const aName = a.meta?.name?.toLowerCase() ?? a.path.toLowerCase();
-    const bName = b.meta?.name?.toLowerCase() ?? b.path.toLowerCase();
-    return aName.localeCompare(bName);
-  });
+  const sanitizeResult = sanitize(record.source);
+  const sourceToParse = sanitizeResult.source;
 
-  return items;
+  if (sanitizeResult.sanitized) {
+    await pool.query(
+      'UPDATE components SET source = $1 WHERE id = $2',
+      [sourceToParse, record.id],
+    );
+  }
+
+  return {
+    found: true,
+    sanitized: sanitizeResult.sanitized,
+    appliedRules: sanitizeResult.appliedRules,
+    parseResult: parseCheck(sourceToParse),
+  };
 }

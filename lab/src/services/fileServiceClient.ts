@@ -48,11 +48,23 @@ type ComponentCatalogItem = {
   }
 }
 
+export class ApiError extends Error {
+  status: number
+  data: unknown
+
+  constructor(message: string, status: number, data: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
 async function parseJsonResponse(res: Response) {
   const data = await res.json()
   if (!res.ok) {
     const message = typeof data?.message === 'string' ? data.message : `Request failed (${res.status})`
-    throw new Error(message)
+    throw new ApiError(message, res.status, data)
   }
   return data
 }
