@@ -7,11 +7,13 @@ import {
   buildGoogleAuthStart,
   clearOAuthStateCookie,
   clearSessionCookie,
+  getAuthDebugConfig,
   getFrontendOrigin,
   initAuthStore,
   OAUTH_STATE_COOKIE_NAME,
   revokeSessionToken,
   getSessionTokensFromRequest,
+  getUserFromSessionTokens,
   setOAuthStateCookie,
   setSessionCookie,
   signInWithGoogleAuthCode,
@@ -110,6 +112,27 @@ app.get('/auth/google/callback', async (req, res) => {
 app.get('/me', requireAuth, (req, res) => {
   const request = req as RequestWithAuth;
   res.json({ success: true, user: request.authUser });
+});
+
+app.get('/debug/auth', async (req, res) => {
+  const sessionTokens = getSessionTokensFromRequest(req);
+  const resolvedSession = await getUserFromSessionTokens(sessionTokens);
+
+  res.json({
+    success: true,
+    config: getAuthDebugConfig(),
+    request: {
+      hasCookieHeader: Boolean(req.headers.cookie),
+      origin: req.headers.origin || null,
+      referer: req.headers.referer || null,
+      parsedSessionTokenCount: sessionTokens.length,
+    },
+    session: {
+      resolved: Boolean(resolvedSession),
+      userId: resolvedSession?.user.id ?? null,
+      email: resolvedSession?.user.email ?? null,
+    },
+  });
 });
 
 app.post('/logout', async (req, res) => {

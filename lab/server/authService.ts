@@ -136,6 +136,18 @@ export function getFrontendOrigin(): string {
   return FRONTEND_ORIGIN;
 }
 
+export function getAuthDebugConfig() {
+  return {
+    frontendOrigin: FRONTEND_ORIGIN,
+    googleRedirectUri: GOOGLE_REDIRECT_URI,
+    sessionCookieName: SESSION_COOKIE_NAME,
+    sessionCookieSameSite: SESSION_COOKIE_SAME_SITE,
+    cookieDomain: COOKIE_DOMAIN || null,
+    secureCookies: IS_PROD,
+    crossSiteSessionFlow: CROSS_SITE_SESSION_FLOW,
+  };
+}
+
 function parseCookieTokens(cookieHeader: string | undefined, name: string): string[] {
   if (!cookieHeader) return [];
   const tokens: string[] = [];
