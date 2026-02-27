@@ -43,6 +43,10 @@ export type ComponentCatalogItem = {
 };
 
 type UserTier = 'free' | 'library' | 'pro';
+type ListComponentsOptions = {
+  includePublic?: boolean;
+  tier?: UserTier;
+};
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -471,11 +475,12 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
   }
 }
 
-export async function listComponents(userId: string, tier: UserTier): Promise<ComponentCatalogItem[]> {
+export async function listComponents(userId: string, options: ListComponentsOptions = {}): Promise<ComponentCatalogItem[]> {
   await initStore();
   await claimLegacyComponentsForUser(userId);
 
-  const includePublic = tier === 'library' || tier === 'pro';
+  const tier = options.tier ?? 'free';
+  const includePublic = Boolean(options.includePublic) && (tier === 'library' || tier === 'pro');
   const result = await pool.query<DbComponentRow>(`
     SELECT
       slug, name, category, subcategory, type,
