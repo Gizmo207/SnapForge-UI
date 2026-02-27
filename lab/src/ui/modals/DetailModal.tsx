@@ -12,6 +12,7 @@ import { s } from '../styles'
 
 type DetailModalProps = {
   item: RegistryItem
+  themeMode: 'dark' | 'light'
   showCode: boolean
   copied: boolean
   onClose: () => void
@@ -23,6 +24,7 @@ type DetailModalProps = {
 
 export function DetailModal({
   item,
+  themeMode,
   showCode,
   copied,
   onClose,
@@ -39,7 +41,7 @@ export function DetailModal({
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(item.component)
-  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '')
+  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '', themeMode)
   const srcDoc = hasReactPreview
     ? generateReactPreviewHtml(item.source || '', previewId, previewTheme)
     : hasHtmlPreview
@@ -144,7 +146,7 @@ export function DetailModal({
                         height: iframeHeight,
                         border: '1px solid var(--border-subtle)',
                         borderRadius: 12,
-                        background: 'rgba(255,255,255,0.02)',
+                        background: previewTheme === 'light' ? '#ffffff' : previewTheme === 'dark' ? '#0f1117' : '#e5e7eb',
                       }}
                     />
                     {previewLoading && (

@@ -4,6 +4,7 @@ import { GalleryCard } from './GalleryCard'
 
 type GalleryGridProps = {
   items: RegistryItem[]
+  themeMode: 'dark' | 'light'
   exportMode: boolean
   exportSelected: Set<number>
   onExportToggle: (index: number) => void
@@ -13,6 +14,7 @@ type GalleryGridProps = {
 
 export function GalleryGrid({
   items,
+  themeMode,
   exportMode,
   exportSelected,
   onExportToggle,
@@ -36,6 +38,7 @@ export function GalleryGrid({
         <GalleryCard
           key={i}
           item={item}
+          themeMode={themeMode}
           exportMode={exportMode}
           exportChecked={exportSelected.has(i)}
           onExportToggle={() => onExportToggle(i)}

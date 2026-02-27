@@ -13,6 +13,7 @@ const GALLERY_PREVIEW_FRAME_HEIGHT = 248
 
 type GalleryCardProps = {
   item: RegistryItem
+  themeMode: 'dark' | 'light'
   exportMode?: boolean
   exportChecked?: boolean
   onExportToggle?: () => void
@@ -20,7 +21,7 @@ type GalleryCardProps = {
   onOpenCode: () => void
 }
 
-export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, onOpenPreview, onOpenCode }: GalleryCardProps) {
+export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExportToggle, onOpenPreview, onOpenCode }: GalleryCardProps) {
   const [hovered, setHovered] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -30,7 +31,7 @@ export function GalleryCard({ item, exportMode, exportChecked, onExportToggle, o
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(Component)
-  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '')
+  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '', themeMode)
   const srcDoc = hasReactPreview
     ? generateReactPreviewHtml(item.source || '', previewId, previewTheme)
     : hasHtmlPreview

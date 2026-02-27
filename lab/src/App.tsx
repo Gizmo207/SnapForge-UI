@@ -384,6 +384,7 @@ function App() {
         <div style={s.main}>
           <GalleryGrid
             items={filtered}
+            themeMode={themeMode}
             exportMode={exportMode}
             exportSelected={exportSelected}
             onExportToggle={(i) => {
@@ -411,6 +412,7 @@ function App() {
       {selected && (
         <DetailModal
           item={selected}
+          themeMode={themeMode}
           showCode={showCode}
           copied={copied}
           onClose={() => setSelected(null)}

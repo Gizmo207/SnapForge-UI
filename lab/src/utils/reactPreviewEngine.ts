@@ -4,6 +4,7 @@ const PREVIEW_BLOCKLIST = ['<script', 'window.', 'document.', 'eval(']
 export const PREVIEW_RESIZE_EVENT = 'SNAPFORGE_PREVIEW_RESIZE'
 export const PREVIEW_STATUS_EVENT = 'SNAPFORGE_PREVIEW_STATUS'
 export type PreviewTheme = 'light' | 'neutral' | 'dark'
+export type AppThemeMode = 'light' | 'dark'
 
 export function isUnsafePreviewSource(sourceCode: string): boolean {
   const lower = sourceCode.toLowerCase()
@@ -67,7 +68,7 @@ function getBasePreviewCss(): string {
   `
 }
 
-export function inferPreviewTheme(tags: string[] = [], source = ''): PreviewTheme {
+export function inferPreviewTheme(tags: string[] = [], source = '', appThemeMode?: AppThemeMode): PreviewTheme {
   const tagSet = new Set(tags.map((tag) => tag.toLowerCase()))
   const src = source.toLowerCase()
 
@@ -77,9 +78,15 @@ export function inferPreviewTheme(tags: string[] = [], source = ''): PreviewThem
   if (darkSignals.some((signal) => tagSet.has(signal))) return 'dark'
   if (lightSignals.some((signal) => tagSet.has(signal))) return 'light'
 
-  if (src.includes('#000') || src.includes('#0f') || src.includes('background: black') || src.includes('background:black')) return 'dark'
-  if (src.includes('#fff') || src.includes('background: white') || src.includes('background:white')) return 'light'
+  const hasExplicitDarkBackground =
+    /background(?:-color)?\s*:\s*(?:black|#000(?:000)?|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,)/i.test(src)
+  const hasExplicitLightBackground =
+    /background(?:-color)?\s*:\s*(?:white|#fff(?:fff)?|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,)/i.test(src)
 
+  if (hasExplicitDarkBackground) return 'dark'
+  if (hasExplicitLightBackground) return 'light'
+  if (appThemeMode === 'dark') return 'dark'
+  if (appThemeMode === 'light') return 'light'
   return 'neutral'
 }
 
