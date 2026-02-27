@@ -10,11 +10,11 @@ const DASH_PROP_REGEX = /(^|,)\s*(-{1,2}[A-Za-z_][\w-]*)\s*:/g;
 export const jsxStyleCustomProps: RuleFn = (source) =>
   source.replace(STYLE_OBJECT_REGEX, (fullMatch, styleBody: string) => {
     const fixedBody = styleBody.replace(DASH_PROP_REGEX, (_match, prefix: string, key: string) => {
-      const cssVarKey = key.startsWith('--') ? key : `-${key.replace(/^-+/, '')}`;
+      // Treat dashed keys as CSS custom properties and enforce the required `--` prefix.
+      const cssVarKey = key.startsWith('--') ? key : `--${key.replace(/^-+/, '')}`;
       return `${prefix} '${cssVarKey}':`;
     });
 
     if (fixedBody === styleBody) return fullMatch;
     return `style={{${fixedBody}}}`;
   });
-
