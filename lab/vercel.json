@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://snapforge-ui-production.up.railway.app/$1"
+    }
+  ]
+}
