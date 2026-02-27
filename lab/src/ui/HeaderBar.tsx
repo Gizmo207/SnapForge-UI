@@ -33,10 +33,12 @@ export function HeaderBar({
   themeMode,
   onToggleTheme,
 }: HeaderBarProps) {
+  const logoSrc = themeMode === 'dark' ? '/logo-dark.png' : '/logo.png'
+
   return (
     <div style={s.header}>
       <div style={s.logo}>
-        <img src="/logo.png" alt="SnapForge UI" style={s.logoImage} />
+        <img src={logoSrc} alt="SnapForge UI" style={s.logoImage} />
       </div>
       <div style={s.searchWrap}>
         <input
