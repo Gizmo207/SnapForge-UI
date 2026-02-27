@@ -1,11 +1,12 @@
 import type { RegistryItem } from '../registry'
 
-export const FILE_SERVICE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
+const DEV_FILE_SERVICE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
+export const FILE_SERVICE_URL = import.meta.env.PROD ? '/api' : DEV_FILE_SERVICE_URL
 
 console.log('PROD API BASE:', FILE_SERVICE_URL)
 
 if (!FILE_SERVICE_URL) {
-  throw new Error('VITE_API_BASE_URL missing in production build')
+  throw new Error('VITE_API_BASE_URL missing for local development')
 }
 type ExportFramework = 'react' | 'html'
 type UserTier = 'free' | 'library' | 'pro'
@@ -98,7 +99,7 @@ export async function saveComponent(payload: SavePayload) {
 }
 
 export async function fetchComponents(): Promise<RegistryItem[]> {
-  const endpoints = [`${FILE_SERVICE_URL}/components`, `${FILE_SERVICE_URL}/api/components`]
+  const endpoints = [`${FILE_SERVICE_URL}/components`]
   let lastError: Error | null = null
 
   for (const endpoint of endpoints) {
@@ -139,7 +140,7 @@ export async function deleteComponent(filePath: string) {
 }
 
 export async function postprocessComponent(filePath: string) {
-  const res = await fetch(`${FILE_SERVICE_URL}/api/postprocess-component`, {
+  const res = await fetch(`${FILE_SERVICE_URL}/postprocess-component`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

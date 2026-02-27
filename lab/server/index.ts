@@ -23,12 +23,94 @@ import { requireAuth, type RequestWithAuth } from './authMiddleware.js';
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
-const allowedOrigins = new Set(
-  (process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
-    .split(',')
+function unique<T>(values: T[]): T[] {
+  return Array.from(new Set(values));
+}
+
+function parseOrigin(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+const configuredOriginEntries = unique(
+  [process.env.FRONTEND_ORIGIN || '', process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173']
+    .flatMap((value) => value.split(','))
     .map((origin) => origin.trim())
     .filter(Boolean),
 );
+
+const exactAllowedOrigins = new Set<string>();
+const wildcardAllowedOrigins: string[] = [];
+
+for (const entry of configuredOriginEntries) {
+  if (entry.includes('*')) {
+    wildcardAllowedOrigins.push(entry);
+  } else {
+    const parsed = parseOrigin(entry);
+    if (parsed) {
+      exactAllowedOrigins.add(parsed.origin);
+    }
+  }
+}
+
+function isWwwVariant(hostname: string, otherHostname: string): boolean {
+  return hostname === `www.${otherHostname}` || otherHostname === `www.${hostname}`;
+}
+
+function matchesWildcardOrigin(origin: string, pattern: string): boolean {
+  const parsedOrigin = parseOrigin(origin);
+  if (!parsedOrigin) return false;
+
+  const [schemePart, hostPart] = pattern.split('://');
+  if (!schemePart || !hostPart) return false;
+  if (parsedOrigin.protocol !== `${schemePart}:`) return false;
+
+  const normalizedPatternHost = hostPart.replace(/\/+$/, '');
+  if (!normalizedPatternHost.includes('*')) return parsedOrigin.host === normalizedPatternHost;
+
+  const escaped = normalizedPatternHost
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*');
+
+  return new RegExp(`^${escaped}$`, 'i').test(parsedOrigin.host);
+}
+
+function isLikelySnapforgePreviewOrigin(origin: string): boolean {
+  const parsed = parseOrigin(origin);
+  if (!parsed) return false;
+  return parsed.hostname.endsWith('.vercel.app') && /snapforge/i.test(parsed.hostname);
+}
+
+function isAllowedOrigin(origin: string): boolean {
+  const parsedOrigin = parseOrigin(origin);
+  if (!parsedOrigin) return false;
+
+  if (exactAllowedOrigins.has(parsedOrigin.origin)) return true;
+
+  for (const allowedOrigin of exactAllowedOrigins) {
+    const parsedAllowed = parseOrigin(allowedOrigin);
+    if (!parsedAllowed) continue;
+
+    const sameProtocol = parsedAllowed.protocol === parsedOrigin.protocol;
+    const samePort = parsedAllowed.port === parsedOrigin.port;
+    if (sameProtocol && samePort && isWwwVariant(parsedOrigin.hostname, parsedAllowed.hostname)) {
+      return true;
+    }
+  }
+
+  if (wildcardAllowedOrigins.some((pattern) => matchesWildcardOrigin(origin, pattern))) {
+    return true;
+  }
+
+  if (isLikelySnapforgePreviewOrigin(origin)) {
+    return true;
+  }
+
+  return false;
+}
 
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
@@ -36,10 +118,15 @@ const corsOptions: CorsOptions = {
       callback(null, true);
       return;
     }
-    if (allowedOrigins.has(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
+    console.warn('CORS rejected origin', {
+      origin,
+      exactAllowedOrigins: Array.from(exactAllowedOrigins),
+      wildcardAllowedOrigins,
+    });
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -212,6 +299,44 @@ app.delete('/delete-component', requireAuth, async (req, res) => {
 });
 
 app.post('/api/postprocess-component', requireAuth, async (req, res) => {
+  const request = req as RequestWithAuth;
+  const authUser = request.authUser;
+  if (!authUser) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+
+  const { filePath } = req.body;
+
+  if (!filePath) {
+    res.status(400).json({ success: false, message: 'Missing filePath' });
+    return;
+  }
+
+  const result = await postprocessComponent(filePath, authUser.id);
+
+  if (!result.found) {
+    res.status(404).json({
+      success: false,
+      message: `File not found: ${filePath}`,
+      sanitized: false,
+      appliedRules: [],
+      parseOk: false,
+      parseErrors: result.parseResult.parseErrors,
+    });
+    return;
+  }
+
+  res.json({
+    success: true,
+    sanitized: result.sanitized,
+    appliedRules: result.appliedRules,
+    parseOk: result.parseResult.parseOk,
+    parseErrors: result.parseResult.parseErrors,
+  });
+});
+
+app.post('/postprocess-component', requireAuth, async (req, res) => {
   const request = req as RequestWithAuth;
   const authUser = request.authUser;
   if (!authUser) {

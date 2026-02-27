@@ -42,41 +42,44 @@ type GoogleIdTokenResponse = {
 const DATABASE_URL = process.env.DATABASE_URL;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const IS_PROD = process.env.NODE_ENV === 'production';
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || (
+  IS_PROD
+    ? `${FRONTEND_ORIGIN.replace(/\/+$/, '')}/api/auth/google/callback`
+    : 'http://localhost:3001/auth/google/callback'
+);
 
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'sf_session';
 export const OAUTH_STATE_COOKIE_NAME = 'sf_oauth_state';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
-const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
-const IS_PROD = process.env.NODE_ENV === 'production';
+const SESSION_COOKIE_SAME_SITE: 'lax' = 'lax';
 
-function safeOrigin(value: string): string | null {
+function parseUrl(value: string): URL | null {
   try {
-    return new URL(value).origin;
+    return new URL(value);
   } catch {
     return null;
   }
 }
-
-const FRONTEND_SITE_ORIGIN = safeOrigin(FRONTEND_ORIGIN);
-const BACKEND_SITE_ORIGIN = safeOrigin(GOOGLE_REDIRECT_URI);
-const CROSS_SITE_SESSION_FLOW =
-  Boolean(IS_PROD && FRONTEND_SITE_ORIGIN && BACKEND_SITE_ORIGIN && FRONTEND_SITE_ORIGIN !== BACKEND_SITE_ORIGIN);
-
-const SAME_SITE_RAW = (
-  process.env.SESSION_COOKIE_SAME_SITE ||
-  (CROSS_SITE_SESSION_FLOW ? 'none' : 'lax')
-).toLowerCase();
-const SESSION_COOKIE_SAME_SITE: 'lax' | 'strict' | 'none' =
-  SAME_SITE_RAW === 'strict' || SAME_SITE_RAW === 'none' ? SAME_SITE_RAW : 'lax';
 
 if (!DATABASE_URL) {
   throw new Error('DATABASE_URL is required for auth');
 }
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
   throw new Error('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI are required for auth');
+}
+
+const frontendUrl = parseUrl(FRONTEND_ORIGIN);
+const redirectUrl = parseUrl(GOOGLE_REDIRECT_URI);
+if (
+  IS_PROD &&
+  frontendUrl &&
+  redirectUrl &&
+  (frontendUrl.origin !== redirectUrl.origin || redirectUrl.pathname !== '/api/auth/google/callback')
+) {
+  throw new Error('GOOGLE_REDIRECT_URI must be the frontend /api/auth/google/callback URL in production');
 }
 
 const useSsl = !/localhost|127\.0\.0\.1/i.test(DATABASE_URL);
@@ -94,7 +97,6 @@ function baseCookieOptions(): CookieOptions {
     secure: IS_PROD,
     sameSite: SESSION_COOKIE_SAME_SITE,
     path: '/',
-    domain: COOKIE_DOMAIN,
   };
 }
 
@@ -108,15 +110,7 @@ export function setSessionCookie(res: Response, sessionToken: string) {
 }
 
 export function clearSessionCookie(res: Response) {
-  const options = baseCookieOptions();
-  res.clearCookie(SESSION_COOKIE_NAME, options);
-  // Also clear host-only variant in case COOKIE_DOMAIN changed between deploys.
-  if (options.domain) {
-    res.clearCookie(SESSION_COOKIE_NAME, {
-      ...options,
-      domain: undefined,
-    });
-  }
+  res.clearCookie(SESSION_COOKIE_NAME, baseCookieOptions());
 }
 
 export function setOAuthStateCookie(res: Response, state: string) {
@@ -142,9 +136,9 @@ export function getAuthDebugConfig() {
     googleRedirectUri: GOOGLE_REDIRECT_URI,
     sessionCookieName: SESSION_COOKIE_NAME,
     sessionCookieSameSite: SESSION_COOKIE_SAME_SITE,
-    cookieDomain: COOKIE_DOMAIN || null,
+    cookieDomain: null,
     secureCookies: IS_PROD,
-    crossSiteSessionFlow: CROSS_SITE_SESSION_FLOW,
+    crossSiteSessionFlow: false,
   };
 }
 
