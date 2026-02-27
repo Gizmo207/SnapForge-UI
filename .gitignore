@@ -7,4 +7,5 @@ coverage/
 .env.*
 !.env.example
 build_anything_protocol/
+client_secret_*.json
 lab/lab/

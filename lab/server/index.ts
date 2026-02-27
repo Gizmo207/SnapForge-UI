@@ -1,13 +1,52 @@
 import express from 'express';
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
+import cookieParser from 'cookie-parser';
 import { saveComponent, deleteComponent, listComponents, postprocessComponent, initStore } from './fileService.js';
 import { exportZipToResponse } from './exportZipService.js';
+import {
+  buildGoogleAuthStart,
+  clearOAuthStateCookie,
+  clearSessionCookie,
+  getFrontendOrigin,
+  initAuthStore,
+  OAUTH_STATE_COOKIE_NAME,
+  revokeSessionToken,
+  SESSION_COOKIE_NAME,
+  setOAuthStateCookie,
+  setSessionCookie,
+  signInWithGoogleAuthCode,
+} from './authService.js';
+import { requireAuth, type RequestWithAuth } from './authMiddleware.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
-app.use(cors());
+const allowedOrigins = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    if (allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+};
+
+app.set('trust proxy', 1);
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cookieParser());
 
 const handleListComponents: express.RequestHandler = async (_req, res) => {
   try {
@@ -29,10 +68,56 @@ app.get('/health', (_req, res) => {
   res.json({ success: true, status: 'ok' });
 });
 
-app.get('/components', handleListComponents);
-app.get('/api/components', handleListComponents);
+app.get('/auth/google/start', (_req, res) => {
+  const { state, url } = buildGoogleAuthStart();
+  setOAuthStateCookie(res, state);
+  res.redirect(url);
+});
 
-app.post('/save-component', async (req, res) => {
+app.get('/auth/google/callback', async (req, res) => {
+  const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+  const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+  const expectedState = req.cookies?.[OAUTH_STATE_COOKIE_NAME] as string | undefined;
+  clearOAuthStateCookie(res);
+
+  if (!code || !state || !expectedState || state !== expectedState) {
+    const redirectUrl = new URL(getFrontendOrigin());
+    redirectUrl.searchParams.set('auth', 'error');
+    redirectUrl.searchParams.set('reason', 'oauth_state');
+    res.redirect(redirectUrl.toString());
+    return;
+  }
+
+  try {
+    const { sessionToken } = await signInWithGoogleAuthCode(code);
+    setSessionCookie(res, sessionToken);
+    res.redirect(getFrontendOrigin());
+  } catch {
+    const redirectUrl = new URL(getFrontendOrigin());
+    redirectUrl.searchParams.set('auth', 'error');
+    redirectUrl.searchParams.set('reason', 'oauth_callback');
+    res.redirect(redirectUrl.toString());
+  }
+});
+
+app.get('/me', requireAuth, (req, res) => {
+  const request = req as RequestWithAuth;
+  res.json({ success: true, user: request.authUser });
+});
+
+app.post('/logout', async (req, res) => {
+  const sessionToken = req.cookies?.[SESSION_COOKIE_NAME] as string | undefined;
+  if (sessionToken) {
+    await revokeSessionToken(sessionToken);
+  }
+  clearSessionCookie(res);
+  res.json({ success: true });
+});
+
+app.get('/components', requireAuth, handleListComponents);
+app.get('/api/components', requireAuth, handleListComponents);
+
+app.post('/save-component', requireAuth, async (req, res) => {
   const { name, code, htmlSource, cssSource, framework, category, subcategory, tags, dependencies } = req.body;
 
   if (!name || !code || !category || !subcategory) {
@@ -69,7 +154,7 @@ app.post('/save-component', async (req, res) => {
   res.status(500).json(result);
 });
 
-app.delete('/delete-component', async (req, res) => {
+app.delete('/delete-component', requireAuth, async (req, res) => {
   const { filePath } = req.body;
 
   if (!filePath) {
@@ -82,7 +167,7 @@ app.delete('/delete-component', async (req, res) => {
   res.status(result.success ? 200 : 404).json(result);
 });
 
-app.post('/api/postprocess-component', async (req, res) => {
+app.post('/api/postprocess-component', requireAuth, async (req, res) => {
   const { filePath } = req.body;
 
   if (!filePath) {
@@ -113,11 +198,12 @@ app.post('/api/postprocess-component', async (req, res) => {
   });
 });
 
-app.post('/export-zip', (req, res) => {
+app.post('/export-zip', requireAuth, (req, res) => {
   exportZipToResponse(req.body, res);
 });
 
 async function start() {
+  await initAuthStore();
   await initStore();
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`File service running on port ${PORT}`);

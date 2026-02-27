@@ -12,7 +12,16 @@ import { Toast } from './ui/Toast'
 import { s } from './ui/styles'
 import { copyToClipboard } from './services/clipboardService'
 import { confirmDialog } from './services/dialogService'
-import { deleteComponent, exportZip, fetchComponents } from './services/fileServiceClient'
+import {
+  ApiError,
+  deleteComponent,
+  exportZip,
+  fetchComponents,
+  fetchMe,
+  getGoogleSignInUrl,
+  logout,
+  type CurrentUser,
+} from './services/fileServiceClient'
 import {
   buildHtmlExportBundle,
   buildReactExportBundle,
@@ -40,6 +49,8 @@ function App() {
   const [exportFramework, setExportFramework] = useState<ExportFramework>('react')
   const [exportDownloading, setExportDownloading] = useState(false)
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([])
+  const [authLoading, setAuthLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   const loadComponents = async () => {
     try {
@@ -51,7 +62,23 @@ function App() {
   }
 
   useEffect(() => {
-    void loadComponents()
+    const bootstrap = async () => {
+      try {
+        const me = await fetchMe()
+        setCurrentUser(me)
+        await loadComponents()
+      } catch (err: unknown) {
+        if (err instanceof ApiError && err.status === 401) {
+          setCurrentUser(null)
+        } else {
+          setToast({ message: err instanceof Error ? err.message : 'Failed to initialize app', type: 'error' })
+        }
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    void bootstrap()
   }, [])
 
   const themeVars: React.CSSProperties = themeMode === 'dark'
@@ -207,12 +234,83 @@ function App() {
     }
   }
 
+  const handleSignIn = () => {
+    window.location.href = getGoogleSignInUrl()
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      setCurrentUser(null)
+      setRegistryItems([])
+      setSelected(null)
+      setShowAddModal(false)
+      setShowExportModal(false)
+      setExportMode(false)
+      setExportSelected(new Set())
+      setSearch('')
+      setSelectedCategory(null)
+      setSelectedSub(null)
+      setSelectedTag(null)
+      setToast({ message: 'Signed out', type: 'success' })
+    } catch (err: unknown) {
+      setToast({ message: err instanceof Error ? err.message : 'Logout failed', type: 'error' })
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <div style={{ ...s.app, ...themeVars, colorScheme: themeMode, display: 'grid', placeItems: 'center' }}>
+        <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Loading session...</div>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <div style={{ ...s.app, ...themeVars, colorScheme: themeMode, display: 'grid', placeItems: 'center', padding: 20 }}>
+        <div
+          style={{
+            width: 'min(460px, 94vw)',
+            borderRadius: 16,
+            border: '1px solid var(--border-subtle)',
+            background: 'var(--surface-card)',
+            padding: 28,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+            textAlign: 'center',
+          }}
+        >
+          <img src="/logo.png" alt="SnapForge UI" style={{ width: 210, margin: '0 auto', display: 'block' }} />
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Sign in to your library</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Continue with Google to access your saved components and curated library.
+          </div>
+          <button style={{ ...s.submitBtn, marginTop: 10 }} onClick={handleSignIn}>
+            Continue with Google
+          </button>
+          <button
+            style={{ ...s.cardBtn, margin: '0 auto', background: 'var(--surface-button)', color: 'var(--text-muted)' }}
+            onClick={() => setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          >
+            Switch to {themeMode === 'dark' ? 'Light' : 'Dark'} Mode
+          </button>
+        </div>
+        {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+      </div>
+    )
+  }
+
   return (
     <div style={{ ...s.app, ...themeVars, colorScheme: themeMode }}>
       <HeaderBar
         filteredCount={filtered.length}
         search={search}
         onSearchChange={setSearch}
+        userLabel={currentUser.name || currentUser.email}
+        userTier={currentUser.tier}
+        onLogout={handleLogout}
         onOpenAddModal={() => setShowAddModal(true)}
         exportMode={exportMode}
         exportSelectedCount={exportSelected.size}

@@ -4,6 +4,9 @@ type HeaderBarProps = {
   filteredCount: number
   search: string
   onSearchChange: (value: string) => void
+  userLabel: string
+  userTier: string
+  onLogout: () => void
   onOpenAddModal: () => void
   exportMode: boolean
   exportSelectedCount: number
@@ -18,6 +21,9 @@ export function HeaderBar({
   filteredCount,
   search,
   onSearchChange,
+  userLabel,
+  userTier,
+  onLogout,
   onOpenAddModal,
   exportMode,
   exportSelectedCount,
@@ -42,6 +48,9 @@ export function HeaderBar({
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={s.count}>
+          {userLabel} · {userTier}
+        </div>
+        <div style={s.count}>
           {filteredCount} component{filteredCount !== 1 ? 's' : ''}
         </div>
         <button
@@ -59,6 +68,14 @@ export function HeaderBar({
           onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-button)' }}
         >
           {themeMode === 'dark' ? 'Light' : 'Dark'}
+        </button>
+        <button
+          style={{ ...s.addBtn, background: 'rgba(255,120,120,0.08)', borderColor: 'rgba(255,120,120,0.25)', color: 'rgba(255,180,180,0.95)' }}
+          onClick={onLogout}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,120,120,0.16)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,120,120,0.08)' }}
+        >
+          Sign out
         </button>
         {exportMode ? (
           <div style={{ display: 'flex', gap: 8 }}>

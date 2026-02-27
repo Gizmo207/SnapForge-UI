@@ -8,6 +8,7 @@ if (!FILE_SERVICE_URL) {
   throw new Error('VITE_API_BASE_URL missing in production build')
 }
 type ExportFramework = 'react' | 'html'
+type UserTier = 'free' | 'library' | 'pro'
 
 type ExportZipComponent = {
   componentDir: string
@@ -30,6 +31,14 @@ export type SavePayload = {
   subcategory: string
   tags: string[]
   dependencies: string[]
+}
+
+export type CurrentUser = {
+  id: string
+  email: string
+  name: string | null
+  avatar: string | null
+  tier: UserTier
 }
 
 type ComponentCatalogItem = {
@@ -73,6 +82,7 @@ export async function saveComponent(payload: SavePayload) {
   const res = await fetch(`${FILE_SERVICE_URL}/save-component`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(payload),
   })
   return parseJsonResponse(res)
@@ -84,7 +94,7 @@ export async function fetchComponents(): Promise<RegistryItem[]> {
 
   for (const endpoint of endpoints) {
     try {
-      const res = await fetch(endpoint)
+      const res = await fetch(endpoint, { credentials: 'include' })
       const data = await parseJsonResponse(res)
       const items = (data.items || []) as ComponentCatalogItem[]
       return items.map((item) => ({
@@ -108,6 +118,7 @@ export async function deleteComponent(filePath: string) {
   const res = await fetch(`${FILE_SERVICE_URL}/delete-component`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ filePath }),
   })
   return parseJsonResponse(res)
@@ -117,6 +128,7 @@ export async function postprocessComponent(filePath: string) {
   const res = await fetch(`${FILE_SERVICE_URL}/api/postprocess-component`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ filePath }),
   })
   return parseJsonResponse(res)
@@ -126,6 +138,7 @@ export async function exportZip(components: ExportZipComponent[], framework: Exp
   const res = await fetch(`${FILE_SERVICE_URL}/export-zip`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ components, framework }),
   })
 
@@ -141,4 +154,25 @@ export async function exportZip(components: ExportZipComponent[], framework: Exp
   }
 
   return res.blob()
+}
+
+export async function fetchMe(): Promise<CurrentUser> {
+  const res = await fetch(`${FILE_SERVICE_URL}/me`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+  const data = await parseJsonResponse(res)
+  return data.user as CurrentUser
+}
+
+export async function logout(): Promise<void> {
+  const res = await fetch(`${FILE_SERVICE_URL}/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  await parseJsonResponse(res)
+}
+
+export function getGoogleSignInUrl(): string {
+  return `${FILE_SERVICE_URL}/auth/google/start`
 }
