@@ -28,6 +28,7 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
   toggles: "Toggle",
   loaders: "Loader",
   inputs: "Input",
+  "radio-buttons": "Radio Button",
   radios: "Radio",
   badges: "Badge",
   tooltips: "Tooltip",

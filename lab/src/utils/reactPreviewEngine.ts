@@ -1,3 +1,5 @@
+import { sanitize } from '../engine/sanitizer/sanitize'
+
 const PREVIEW_BLOCKLIST = ['<script', 'window.', 'document.', 'eval(']
 export const PREVIEW_RESIZE_EVENT = 'SNAPFORGE_PREVIEW_RESIZE'
 export const PREVIEW_STATUS_EVENT = 'SNAPFORGE_PREVIEW_STATUS'
@@ -122,7 +124,8 @@ function buildResizeScript(previewId: string): string {
 }
 
 export function generateReactPreviewHtml(sourceCode: string, previewId: string, theme: PreviewTheme = 'neutral'): string {
-  const withoutImports = sourceCode
+  const sanitizedSource = sanitize(sourceCode).source
+  const withoutImports = sanitizedSource
     .split('\n')
     .filter((line) => !line.trim().startsWith('import '))
     .join('\n')

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "server": "tsx server/index.ts",
     "update-tsconfig": "node scripts/updateTsconfig.js",
-    "backfill:db": "tsx scripts/backfillComponentsToDb.ts"
+    "backfill:db": "tsx scripts/backfillComponentsToDb.ts",
+    "fix:legacy-components": "tsx scripts/fixLegacyComponents.ts"
   },
   "dependencies": {
     "@babel/parser": "^7.29.0",

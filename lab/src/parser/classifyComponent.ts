@@ -33,10 +33,10 @@ const rules: Rule[] = [
   { pattern: /on-off|onoff/i, category: "primitives", subcategory: "toggles", tag: "toggle", priority: 8 },
 
   // ── Radio Buttons ──────────────────────────────────────────
-  { pattern: /input.*type=["']radio["']/i, category: "primitives", subcategory: "radios", tag: "radio", priority: 11 },
-  { pattern: /radio/i, category: "primitives", subcategory: "radios", tag: "radio", priority: 10 },
-  { pattern: /radio-group|radiogroup/i, category: "primitives", subcategory: "radios", tag: "radio", priority: 10 },
-  { pattern: /radio-button|radiobutton/i, category: "primitives", subcategory: "radios", tag: "radio", priority: 10 },
+  { pattern: /input.*type=["']radio["']/i, category: "primitives", subcategory: "radio-buttons", tag: "radio", priority: 11 },
+  { pattern: /radio/i, category: "primitives", subcategory: "radio-buttons", tag: "radio", priority: 10 },
+  { pattern: /radio-group|radiogroup/i, category: "primitives", subcategory: "radio-buttons", tag: "radio", priority: 10 },
+  { pattern: /radio-button|radiobutton/i, category: "primitives", subcategory: "radio-buttons", tag: "radio", priority: 10 },
 
   // ── Inputs ─────────────────────────────────────────────────
   // High priority: Input elements with search-related attributes

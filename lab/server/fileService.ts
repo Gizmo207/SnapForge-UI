@@ -149,6 +149,28 @@ export async function initStore(): Promise<void> {
       EXECUTE FUNCTION set_components_updated_at();
     `);
 
+    await pool.query(`
+      UPDATE components
+      SET subcategory = 'radio-buttons'
+      WHERE subcategory = 'radios';
+    `);
+
+    // Backfill sanitize for legacy source rows so old invalid JSX style keys don't break preview.
+    const sourceRows = await pool.query<{ id: number; source: string }>(`
+      SELECT id, source
+      FROM components
+      WHERE source IS NOT NULL;
+    `);
+    for (const row of sourceRows.rows) {
+      const sanitized = sanitize(row.source).source;
+      if (sanitized !== row.source) {
+        await pool.query(
+          'UPDATE components SET source = $1 WHERE id = $2',
+          [sanitized, row.id],
+        );
+      }
+    }
+
     // Migrate legacy global rows to the first created user so they stop leaking across accounts.
     // If auth tables are not initialized in a given runtime, ignore and continue.
     try {
@@ -313,10 +335,11 @@ type DbComponentRow = {
 };
 
 function mapRowToCatalogItem(row: DbComponentRow): ComponentCatalogItem {
+  const sanitizedSource = sanitize(row.source).source;
   return {
     path: `${row.slug}/react.tsx`,
     componentDir: row.slug,
-    source: row.source,
+    source: sanitizedSource,
     htmlSource: row.html_source ?? undefined,
     cssSource: row.css_source ?? undefined,
     meta: {
@@ -359,7 +382,8 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
 
   const detectedFramework = detectFramework(req.code);
   const category = normalizeSegment(req.category, 'components');
-  const subcategory = normalizeSegment(req.subcategory, 'misc');
+  const rawSubcategory = normalizeSegment(req.subcategory, 'misc');
+  const subcategory = rawSubcategory === 'radios' ? 'radio-buttons' : rawSubcategory;
   const name = req.name.trim() || 'Component';
   const fileName = normalizeName(name) || 'component';
   const componentDir = `${category}/${subcategory}/${fileName}`;
@@ -376,6 +400,7 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
       tags: normalizeArray(req.tags),
       dependencies: normalizeArray(req.dependencies),
     });
+    const sanitizedCode = sanitize(finalCode).source;
 
     const result = await pool.query<{ slug: string }>(
       `
@@ -396,7 +421,7 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
         detectedFramework,
         normalizeArray(req.tags),
         normalizeArray(req.dependencies),
-        finalCode,
+        sanitizedCode,
         detectedFramework === 'html' && req.htmlSource?.trim() ? req.htmlSource : null,
         detectedFramework === 'html' && req.cssSource?.trim() ? req.cssSource : null,
       ],

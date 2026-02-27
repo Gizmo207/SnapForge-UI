@@ -3,12 +3,14 @@ import { classToClassName } from './rules/classToClassName';
 import { htmlForAttr } from './rules/htmlForAttr';
 import { booleanAttrs } from './rules/booleanAttrs';
 import { svgCamelCase } from './rules/svgCamelCase';
+import { jsxStyleCustomProps } from './rules/jsxStyleCustomProps';
 
 const RULES: { name: string; fn: RuleFn }[] = [
   { name: 'classToClassName', fn: classToClassName },
   { name: 'htmlForAttr', fn: htmlForAttr },
   { name: 'booleanAttrs', fn: booleanAttrs },
   { name: 'svgCamelCase', fn: svgCamelCase },
+  { name: 'jsxStyleCustomProps', fn: jsxStyleCustomProps },
 ];
 
 export function sanitize(source: string): SanitizeResult {
