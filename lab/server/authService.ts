@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { CookieOptions, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { Pool } from 'pg';
 
@@ -78,6 +78,8 @@ function baseCookieOptions(): CookieOptions {
 }
 
 export function setSessionCookie(res: Response, sessionToken: string) {
+  // Clear host-only and domain cookies first to prevent duplicate sf_session cookies.
+  clearSessionCookie(res);
   res.cookie(SESSION_COOKIE_NAME, sessionToken, {
     ...baseCookieOptions(),
     maxAge: SESSION_MAX_AGE_SECONDS * 1000,
@@ -85,9 +87,15 @@ export function setSessionCookie(res: Response, sessionToken: string) {
 }
 
 export function clearSessionCookie(res: Response) {
-  res.clearCookie(SESSION_COOKIE_NAME, {
-    ...baseCookieOptions(),
-  });
+  const options = baseCookieOptions();
+  res.clearCookie(SESSION_COOKIE_NAME, options);
+  // Also clear host-only variant in case COOKIE_DOMAIN changed between deploys.
+  if (options.domain) {
+    res.clearCookie(SESSION_COOKIE_NAME, {
+      ...options,
+      domain: undefined,
+    });
+  }
 }
 
 export function setOAuthStateCookie(res: Response, state: string) {
@@ -105,6 +113,45 @@ export function clearOAuthStateCookie(res: Response) {
 
 export function getFrontendOrigin(): string {
   return FRONTEND_ORIGIN;
+}
+
+function parseCookieTokens(cookieHeader: string | undefined, name: string): string[] {
+  if (!cookieHeader) return [];
+  const tokens: string[] = [];
+  const needle = `${name}=`;
+
+  for (const chunk of cookieHeader.split(';')) {
+    const part = chunk.trim();
+    if (!part.startsWith(needle)) continue;
+    const rawValue = part.slice(needle.length);
+    if (!rawValue) continue;
+    try {
+      tokens.push(decodeURIComponent(rawValue));
+    } catch {
+      tokens.push(rawValue);
+    }
+  }
+
+  return tokens;
+}
+
+export function getSessionTokensFromRequest(req: Request): string[] {
+  const tokens = parseCookieTokens(req.headers.cookie, SESSION_COOKIE_NAME);
+  const parserValue = req.cookies?.[SESSION_COOKIE_NAME];
+  if (typeof parserValue === 'string' && parserValue.trim()) {
+    tokens.push(parserValue);
+  }
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const token of tokens) {
+    const value = token.trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    unique.push(value);
+  }
+
+  return unique;
 }
 
 function hashToken(token: string): string {

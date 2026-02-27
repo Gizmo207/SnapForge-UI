@@ -11,7 +11,7 @@ import {
   initAuthStore,
   OAUTH_STATE_COOKIE_NAME,
   revokeSessionToken,
-  SESSION_COOKIE_NAME,
+  getSessionTokensFromRequest,
   setOAuthStateCookie,
   setSessionCookie,
   signInWithGoogleAuthCode,
@@ -113,8 +113,8 @@ app.get('/me', requireAuth, (req, res) => {
 });
 
 app.post('/logout', async (req, res) => {
-  const sessionToken = req.cookies?.[SESSION_COOKIE_NAME] as string | undefined;
-  if (sessionToken) {
+  const sessionTokens = getSessionTokensFromRequest(req);
+  for (const sessionToken of sessionTokens) {
     await revokeSessionToken(sessionToken);
   }
   clearSessionCookie(res);

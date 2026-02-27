@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { clearSessionCookie, getUserFromSessionToken, SESSION_COOKIE_NAME, type AuthUser } from './authService.js';
+import { clearSessionCookie, getSessionTokensFromRequest, getUserFromSessionToken, type AuthUser } from './authService.js';
 
 export type RequestWithAuth = Request & {
   authUser?: AuthUser;
@@ -8,13 +8,26 @@ export type RequestWithAuth = Request & {
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
-    const sessionToken = req.cookies?.[SESSION_COOKIE_NAME] as string | undefined;
-    if (!sessionToken) {
+    const sessionTokens = getSessionTokensFromRequest(req);
+    if (sessionTokens.length === 0) {
       res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    const user = await getUserFromSessionToken(sessionToken);
+    let sessionToken: string | undefined;
+    let user: AuthUser | null = null;
+
+    // Prefer the latest cookie value when duplicates exist.
+    for (let i = sessionTokens.length - 1; i >= 0; i -= 1) {
+      const candidate = sessionTokens[i];
+      const resolvedUser = await getUserFromSessionToken(candidate);
+      if (resolvedUser) {
+        sessionToken = candidate;
+        user = resolvedUser;
+        break;
+      }
+    }
+
     if (!user) {
       clearSessionCookie(res);
       res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -32,4 +45,3 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     });
   }
 }
-
