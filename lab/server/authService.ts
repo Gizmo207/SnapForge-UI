@@ -21,6 +21,10 @@ type SessionLookupRow = {
   tier: Tier;
 };
 
+type SessionLookupWithHashRow = SessionLookupRow & {
+  token_hash: string;
+};
+
 type UserRow = {
   id: string;
   email: string;
@@ -332,23 +336,58 @@ export async function signInWithGoogleAuthCode(code: string): Promise<{ user: Au
 }
 
 export async function getUserFromSessionToken(sessionToken: string): Promise<AuthUser | null> {
+  const resolved = await getUserFromSessionTokens([sessionToken]);
+  return resolved?.user ?? null;
+}
+
+export async function getUserFromSessionTokens(sessionTokens: string[]): Promise<{ user: AuthUser; sessionToken: string } | null> {
   await initAuthStore();
 
-  if (!sessionToken) return null;
-  const tokenHash = hashToken(sessionToken);
+  const normalizedTokens = sessionTokens
+    .map((token) => token.trim())
+    .filter(Boolean);
 
-  const result = await pool.query<SessionLookupRow>(
+  if (normalizedTokens.length === 0) return null;
+
+  const tokenByHash = new Map<string, string>();
+  for (const token of normalizedTokens) {
+    const tokenHash = hashToken(token);
+    if (!tokenByHash.has(tokenHash)) {
+      tokenByHash.set(tokenHash, token);
+    }
+  }
+
+  const tokenHashes = Array.from(tokenByHash.keys());
+  if (tokenHashes.length === 0) return null;
+
+  const result = await pool.query<SessionLookupWithHashRow>(
     `
-      SELECT u.id, u.email, u.name, u.avatar, u.tier
+      SELECT s.token_hash, u.id, u.email, u.name, u.avatar, u.tier
       FROM sessions s
       JOIN users u ON u.id = s.user_id
-      WHERE s.token_hash = $1 AND s.expires_at > NOW()
+      WHERE s.token_hash = ANY($1::text[]) AND s.expires_at > NOW()
+      ORDER BY s.created_at DESC
       LIMIT 1
     `,
-    [tokenHash],
+    [tokenHashes],
   );
 
-  return result.rows[0] ?? null;
+  const row = result.rows[0];
+  if (!row) return null;
+
+  const sessionToken = tokenByHash.get(row.token_hash);
+  if (!sessionToken) return null;
+
+  return {
+    user: {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      avatar: row.avatar,
+      tier: row.tier,
+    },
+    sessionToken,
+  };
 }
 
 export async function revokeSessionToken(sessionToken: string): Promise<void> {

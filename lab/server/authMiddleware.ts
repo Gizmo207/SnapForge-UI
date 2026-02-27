@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { clearSessionCookie, getSessionTokensFromRequest, getUserFromSessionToken, type AuthUser } from './authService.js';
+import { clearSessionCookie, getSessionTokensFromRequest, getUserFromSessionTokens, type AuthUser } from './authService.js';
 
 export type RequestWithAuth = Request & {
   authUser?: AuthUser;
@@ -14,19 +14,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    let sessionToken: string | undefined;
-    let user: AuthUser | null = null;
-
-    // Prefer the latest cookie value when duplicates exist.
-    for (let i = sessionTokens.length - 1; i >= 0; i -= 1) {
-      const candidate = sessionTokens[i];
-      const resolvedUser = await getUserFromSessionToken(candidate);
-      if (resolvedUser) {
-        sessionToken = candidate;
-        user = resolvedUser;
-        break;
-      }
-    }
+    const resolvedSession = await getUserFromSessionTokens(sessionTokens);
+    const user: AuthUser | null = resolvedSession?.user ?? null;
+    const sessionToken = resolvedSession?.sessionToken;
 
     if (!user) {
       clearSessionCookie(res);

@@ -93,7 +93,11 @@ export function inferPreviewTheme(tags: string[] = [], source = '', appThemeMode
 function buildResizeScript(previewId: string): string {
   const serializedId = serializeForTemplate(previewId)
   return `
+      window.__snapforgePreviewReady = false;
       function __snapforgePostStatus(status, message) {
+        if (status === 'ready' || status === 'error') {
+          window.__snapforgePreviewReady = true;
+        }
         window.parent.postMessage(
           { type: "${PREVIEW_STATUS_EVENT}", previewId: ${serializedId}, status, message },
           "*"
@@ -126,7 +130,14 @@ function buildResizeScript(previewId: string): string {
         const __snapforgeObserver = new ResizeObserver(__snapforgeReportSize);
         __snapforgeObserver.observe(document.body);
       }
-      setTimeout(function() { __snapforgePostStatus('ready', 'ok'); }, 80);
+      window.__snapforgeMarkReady = function() {
+        __snapforgePostStatus('ready', 'ok');
+      };
+      setTimeout(function() {
+        if (!window.__snapforgePreviewReady) {
+          __snapforgePostStatus('error', 'Preview initialization timed out');
+        }
+      }, 3500);
   `
 }
 
@@ -177,18 +188,98 @@ export function generateReactPreviewHtml(sourceCode: string, previewId: string, 
         </div>
       </div>
 
-      <script type="text/babel">
-        const exports = {};
-        const styled = window.styled;
+      <script>
+        window.__snapforgePreviewExports = {};
+        window.__snapforgePreviewStyled = window.styled;
         ${buildResizeScript(previewId)}
+        window.__snapforgeEnsureLayoutFallback = function() {
+          const docEl = document.documentElement;
+          const body = document.body;
+          const previewRoot = document.getElementById('preview-root');
+          const canvas = document.querySelector('.preview-canvas');
+          const center = document.getElementById('root');
+
+          if (docEl) {
+            docEl.style.width = '100%';
+            docEl.style.height = '100%';
+          }
+          if (body) {
+            body.style.width = '100%';
+            body.style.height = '100%';
+            body.style.margin = '0';
+          }
+          if (previewRoot instanceof HTMLElement) {
+            if (!previewRoot.style.width) previewRoot.style.width = '100%';
+            if (!previewRoot.style.height) previewRoot.style.height = '100%';
+          }
+          if (canvas instanceof HTMLElement) {
+            if (!canvas.style.width) canvas.style.width = '100%';
+            if (!canvas.style.height) canvas.style.height = '100%';
+            if (!canvas.style.minHeight) canvas.style.minHeight = '120px';
+            if (!canvas.style.display) canvas.style.display = 'flex';
+            if (!canvas.style.alignItems) canvas.style.alignItems = 'center';
+            if (!canvas.style.justifyContent) canvas.style.justifyContent = 'center';
+            if (!canvas.style.boxSizing) canvas.style.boxSizing = 'border-box';
+          }
+          if (center instanceof HTMLElement) {
+            if (!center.style.width) center.style.width = '100%';
+            if (!center.style.height) center.style.height = '100%';
+            if (!center.style.minHeight) center.style.minHeight = '160px';
+            if (!center.style.display) center.style.display = 'flex';
+            if (!center.style.alignItems) center.style.alignItems = 'center';
+            if (!center.style.justifyContent) center.style.justifyContent = 'center';
+          }
+        };
+        window.__snapforgeEnsureLayoutFallback();
+      </script>
+
+      <script type="text/babel">
+        const exports = window.__snapforgePreviewExports || {};
+        const styled = window.__snapforgePreviewStyled || window.styled;
         ${safeSource}
         exports.default = ${exportTarget};
 
         const Component = exports.default || Object.values(exports)[0];
         const root = ReactDOM.createRoot(document.getElementById('root'));
+        function __snapforgeNudgeCollapsedRoot() {
+          if (typeof window.__snapforgeEnsureLayoutFallback === 'function') {
+            window.__snapforgeEnsureLayoutFallback();
+          }
+          const mount = document.getElementById('root');
+          const first = mount ? mount.firstElementChild : null;
+          if (!first) return;
+          const rect = first.getBoundingClientRect ? first.getBoundingClientRect() : null;
+          if (!rect || rect.width >= 2 && rect.height >= 2) return;
+
+          if (first instanceof HTMLElement) {
+            if (!first.style.width) first.style.width = '100%';
+            if (!first.style.height) first.style.height = '100%';
+            __snapforgeReportSize();
+            return;
+          }
+
+          if (first instanceof SVGElement) {
+            if (!first.getAttribute('width')) first.setAttribute('width', '100%');
+            if (!first.getAttribute('height')) first.setAttribute('height', '100%');
+            __snapforgeReportSize();
+          }
+        }
         try {
           if (Component) {
             root.render(React.createElement(Component));
+            if (window.requestAnimationFrame) {
+              window.requestAnimationFrame(__snapforgeNudgeCollapsedRoot);
+            } else {
+              setTimeout(__snapforgeNudgeCollapsedRoot, 30);
+            }
+            setTimeout(__snapforgeNudgeCollapsedRoot, 140);
+            setTimeout(function() {
+              if (typeof window.__snapforgeMarkReady === 'function') {
+                window.__snapforgeMarkReady();
+              } else {
+                __snapforgePostStatus('ready', 'ok');
+              }
+            }, 80);
           } else {
             throw new Error('No default component export found for preview');
           }
@@ -211,6 +302,13 @@ export function generateHtmlPreviewHtml(
   return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss()} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center">${htmlSource}</div></div></div>
   <script>
   ${buildResizeScript(previewId)}
+  setTimeout(function() {
+    if (typeof window.__snapforgeMarkReady === 'function') {
+      window.__snapforgeMarkReady();
+    } else {
+      __snapforgePostStatus('ready', 'ok');
+    }
+  }, 80);
   <\/script>
   </body></html>`
 }
