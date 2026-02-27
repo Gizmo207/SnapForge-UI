@@ -65,7 +65,7 @@ export async function initStore(): Promise<void> {
       CREATE TABLE IF NOT EXISTS components (
         id BIGSERIAL PRIMARY KEY,
         slug TEXT NOT NULL,
-        owner_id UUID,
+        owner_id UUID NOT NULL,
         is_public BOOLEAN NOT NULL DEFAULT FALSE,
         name TEXT NOT NULL,
         category TEXT NOT NULL,
@@ -91,6 +91,17 @@ export async function initStore(): Promise<void> {
       ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
     `);
 
+    // Hard-stop legacy global rows. Private components without an owner are invalid.
+    await pool.query(`
+      DELETE FROM components
+      WHERE owner_id IS NULL;
+    `);
+
+    await pool.query(`
+      ALTER TABLE components
+      ALTER COLUMN owner_id SET NOT NULL;
+    `);
+
     await pool.query(`
       ALTER TABLE components
       DROP CONSTRAINT IF EXISTS components_slug_key;
@@ -103,9 +114,7 @@ export async function initStore(): Promise<void> {
     `);
 
     await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_components_public_slug_unique
-      ON components (slug)
-      WHERE owner_id IS NULL;
+      DROP INDEX IF EXISTS idx_components_public_slug_unique;
     `);
 
     await pool.query(`
@@ -169,50 +178,9 @@ export async function initStore(): Promise<void> {
       }
     }
 
-    // Migrate legacy global rows to the first created user so they stop leaking across accounts.
-    // If auth tables are not initialized in a given runtime, ignore and continue.
-    try {
-      await pool.query(`
-        WITH first_user AS (
-          SELECT id
-          FROM users
-          ORDER BY created_at ASC
-          LIMIT 1
-        )
-        UPDATE components
-        SET owner_id = (SELECT id FROM first_user)
-        WHERE owner_id IS NULL
-          AND is_public = FALSE
-          AND EXISTS (SELECT 1 FROM first_user);
-      `);
-    } catch (err: unknown) {
-      const pgErr = err as { code?: string };
-      if (pgErr.code !== '42P01') {
-        throw err;
-      }
-    }
   })();
 
   return initPromise;
-}
-
-async function claimLegacyComponentsForUser(userId: string): Promise<void> {
-  await pool.query(
-    `
-      UPDATE components
-      SET owner_id = $1
-      WHERE owner_id IS NULL
-        AND is_public = FALSE
-        AND NOT EXISTS (
-          SELECT 1
-          FROM components claimed
-          WHERE claimed.owner_id IS NOT NULL
-            AND claimed.is_public = FALSE
-            AND claimed.owner_id <> $1
-        );
-    `,
-    [userId],
-  );
 }
 
 function normalizeName(name: string): string {
@@ -471,7 +439,6 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
 
 export async function listComponents(userId: string): Promise<ComponentCatalogItem[]> {
   await initStore();
-  await claimLegacyComponentsForUser(userId);
 
   const result = await pool.query<DbComponentRow>(`
     SELECT
