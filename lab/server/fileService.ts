@@ -42,12 +42,6 @@ export type ComponentCatalogItem = {
   meta?: ComponentMeta;
 };
 
-type UserTier = 'free' | 'library' | 'pro';
-type ListComponentsOptions = {
-  includePublic?: boolean;
-  tier?: UserTier;
-};
-
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
@@ -475,30 +469,18 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
   }
 }
 
-export async function listComponents(userId: string, options: ListComponentsOptions = {}): Promise<ComponentCatalogItem[]> {
+export async function listComponents(userId: string): Promise<ComponentCatalogItem[]> {
   await initStore();
   await claimLegacyComponentsForUser(userId);
 
-  const tier = options.tier ?? 'free';
-  const includePublic = Boolean(options.includePublic) && (tier === 'library' || tier === 'pro');
   const result = await pool.query<DbComponentRow>(`
     SELECT
       slug, name, category, subcategory, type,
       tags, dependencies, source, html_source, css_source
     FROM components
     WHERE owner_id = $1
-      OR (
-        $2::boolean = TRUE
-        AND is_public = TRUE
-        AND NOT EXISTS (
-          SELECT 1
-          FROM components own
-          WHERE own.owner_id = $1
-            AND own.slug = components.slug
-        )
-      )
     ORDER BY created_at DESC, id DESC
-  `, [userId, includePublic]);
+  `, [userId]);
 
   return result.rows.map(mapRowToCatalogItem);
 }

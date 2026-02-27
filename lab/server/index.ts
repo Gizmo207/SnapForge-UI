@@ -57,15 +57,7 @@ const handleListComponents: express.RequestHandler = async (req, res) => {
   }
 
   try {
-    const includePublic =
-      req.query.includePublic === '1' ||
-      req.query.includePublic === 'true' ||
-      req.query.scope === 'all';
-
-    const items = await listComponents(authUser.id, {
-      includePublic,
-      tier: authUser.tier,
-    });
+    const items = await listComponents(authUser.id);
     res.json({ success: true, items });
   } catch (err: unknown) {
     res.status(500).json({
