@@ -259,6 +259,7 @@ function App() {
   }
 
   const logoSrc = themeMode === 'dark' ? '/logo-dark.png' : '/logo.png'
+  const loginLogoWidth = themeMode === 'dark' ? 300 : 210
 
   if (authLoading) {
     return (
@@ -284,7 +285,7 @@ function App() {
             textAlign: 'center',
           }}
         >
-          <img src={logoSrc} alt="SnapForge UI" style={{ width: 210, margin: '0 auto', display: 'block' }} />
+          <img src={logoSrc} alt="SnapForge UI" style={{ width: loginLogoWidth, maxWidth: '80vw', margin: '0 auto', display: 'block' }} />
           <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Sign in to your library</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             Continue with Google to access your saved components and curated library.
