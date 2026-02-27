@@ -51,7 +51,24 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
 const IS_PROD = process.env.NODE_ENV === 'production';
-const SAME_SITE_RAW = (process.env.SESSION_COOKIE_SAME_SITE || 'lax').toLowerCase();
+
+function safeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+const FRONTEND_SITE_ORIGIN = safeOrigin(FRONTEND_ORIGIN);
+const BACKEND_SITE_ORIGIN = safeOrigin(GOOGLE_REDIRECT_URI);
+const CROSS_SITE_SESSION_FLOW =
+  Boolean(IS_PROD && FRONTEND_SITE_ORIGIN && BACKEND_SITE_ORIGIN && FRONTEND_SITE_ORIGIN !== BACKEND_SITE_ORIGIN);
+
+const SAME_SITE_RAW = (
+  process.env.SESSION_COOKIE_SAME_SITE ||
+  (CROSS_SITE_SESSION_FLOW ? 'none' : 'lax')
+).toLowerCase();
 const SESSION_COOKIE_SAME_SITE: 'lax' | 'strict' | 'none' =
   SAME_SITE_RAW === 'strict' || SAME_SITE_RAW === 'none' ? SAME_SITE_RAW : 'lax';
 
