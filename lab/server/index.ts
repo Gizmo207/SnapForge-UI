@@ -48,9 +48,16 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
-const handleListComponents: express.RequestHandler = async (_req, res) => {
+const handleListComponents: express.RequestHandler = async (req, res) => {
+  const request = req as RequestWithAuth;
+  const authUser = request.authUser;
+  if (!authUser) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+
   try {
-    const items = await listComponents();
+    const items = await listComponents(authUser.id, authUser.tier);
     res.json({ success: true, items });
   } catch (err: unknown) {
     res.status(500).json({
@@ -118,6 +125,13 @@ app.get('/components', requireAuth, handleListComponents);
 app.get('/api/components', requireAuth, handleListComponents);
 
 app.post('/save-component', requireAuth, async (req, res) => {
+  const request = req as RequestWithAuth;
+  const authUser = request.authUser;
+  if (!authUser) {
+    res.status(401).json({ success: false, status: 'error', message: 'Unauthorized' });
+    return;
+  }
+
   const { name, code, htmlSource, cssSource, framework, category, subcategory, tags, dependencies } = req.body;
 
   if (!name || !code || !category || !subcategory) {
@@ -139,7 +153,7 @@ app.post('/save-component', requireAuth, async (req, res) => {
     subcategory,
     tags: tags || [],
     dependencies: dependencies || [],
-  });
+  }, authUser.id);
 
   if (result.success) {
     res.status(200).json(result);
@@ -155,6 +169,13 @@ app.post('/save-component', requireAuth, async (req, res) => {
 });
 
 app.delete('/delete-component', requireAuth, async (req, res) => {
+  const request = req as RequestWithAuth;
+  const authUser = request.authUser;
+  if (!authUser) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+
   const { filePath } = req.body;
 
   if (!filePath) {
@@ -162,12 +183,19 @@ app.delete('/delete-component', requireAuth, async (req, res) => {
     return;
   }
 
-  const result = await deleteComponent(filePath);
+  const result = await deleteComponent(filePath, authUser.id);
 
   res.status(result.success ? 200 : 404).json(result);
 });
 
 app.post('/api/postprocess-component', requireAuth, async (req, res) => {
+  const request = req as RequestWithAuth;
+  const authUser = request.authUser;
+  if (!authUser) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+
   const { filePath } = req.body;
 
   if (!filePath) {
@@ -175,7 +203,7 @@ app.post('/api/postprocess-component', requireAuth, async (req, res) => {
     return;
   }
 
-  const result = await postprocessComponent(filePath);
+  const result = await postprocessComponent(filePath, authUser.id);
 
   if (!result.found) {
     res.status(404).json({

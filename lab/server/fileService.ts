@@ -42,6 +42,8 @@ export type ComponentCatalogItem = {
   meta?: ComponentMeta;
 };
 
+type UserTier = 'free' | 'library' | 'pro';
+
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
@@ -64,7 +66,9 @@ export async function initStore(): Promise<void> {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS components (
         id BIGSERIAL PRIMARY KEY,
-        slug TEXT NOT NULL UNIQUE,
+        slug TEXT NOT NULL,
+        owner_id UUID,
+        is_public BOOLEAN NOT NULL DEFAULT FALSE,
         name TEXT NOT NULL,
         category TEXT NOT NULL,
         subcategory TEXT NOT NULL,
@@ -80,8 +84,46 @@ export async function initStore(): Promise<void> {
     `);
 
     await pool.query(`
+      ALTER TABLE components
+      ADD COLUMN IF NOT EXISTS owner_id UUID;
+    `);
+
+    await pool.query(`
+      ALTER TABLE components
+      ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    await pool.query(`
+      ALTER TABLE components
+      DROP CONSTRAINT IF EXISTS components_slug_key;
+    `);
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_components_owner_slug_unique
+      ON components (owner_id, slug)
+      WHERE owner_id IS NOT NULL;
+    `);
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_components_public_slug_unique
+      ON components (slug)
+      WHERE owner_id IS NULL;
+    `);
+
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_components_category_subcategory
       ON components (category, subcategory);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_components_owner_created
+      ON components (owner_id, created_at DESC);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_components_public_created
+      ON components (created_at DESC)
+      WHERE is_public = TRUE;
     `);
 
     await pool.query(`
@@ -106,9 +148,51 @@ export async function initStore(): Promise<void> {
       FOR EACH ROW
       EXECUTE FUNCTION set_components_updated_at();
     `);
+
+    // Migrate legacy global rows to the first created user so they stop leaking across accounts.
+    // If auth tables are not initialized in a given runtime, ignore and continue.
+    try {
+      await pool.query(`
+        WITH first_user AS (
+          SELECT id
+          FROM users
+          ORDER BY created_at ASC
+          LIMIT 1
+        )
+        UPDATE components
+        SET owner_id = (SELECT id FROM first_user)
+        WHERE owner_id IS NULL
+          AND is_public = FALSE
+          AND EXISTS (SELECT 1 FROM first_user);
+      `);
+    } catch (err: unknown) {
+      const pgErr = err as { code?: string };
+      if (pgErr.code !== '42P01') {
+        throw err;
+      }
+    }
   })();
 
   return initPromise;
+}
+
+async function claimLegacyComponentsForUser(userId: string): Promise<void> {
+  await pool.query(
+    `
+      UPDATE components
+      SET owner_id = $1
+      WHERE owner_id IS NULL
+        AND is_public = FALSE
+        AND NOT EXISTS (
+          SELECT 1
+          FROM components claimed
+          WHERE claimed.owner_id IS NOT NULL
+            AND claimed.is_public = FALSE
+            AND claimed.owner_id <> $1
+        );
+    `,
+    [userId],
+  );
 }
 
 function normalizeName(name: string): string {
@@ -246,7 +330,7 @@ function mapRowToCatalogItem(row: DbComponentRow): ComponentCatalogItem {
   };
 }
 
-export async function deleteComponent(filePath: string): Promise<{ success: boolean; message: string }> {
+export async function deleteComponent(filePath: string, userId: string): Promise<{ success: boolean; message: string }> {
   await initStore();
 
   const slug = slugFromFilePath(filePath);
@@ -256,8 +340,8 @@ export async function deleteComponent(filePath: string): Promise<{ success: bool
 
   try {
     const result = await pool.query<{ slug: string }>(
-      'DELETE FROM components WHERE slug = $1 RETURNING slug',
-      [slug],
+      'DELETE FROM components WHERE slug = $1 AND owner_id = $2 AND is_public = FALSE RETURNING slug',
+      [slug, userId],
     );
 
     if (result.rowCount === 0) {
@@ -270,7 +354,7 @@ export async function deleteComponent(filePath: string): Promise<{ success: bool
   }
 }
 
-export async function saveComponent(req: SaveRequest): Promise<SaveResult> {
+export async function saveComponent(req: SaveRequest, userId: string): Promise<SaveResult> {
   await initStore();
 
   const detectedFramework = detectFramework(req.code);
@@ -296,15 +380,16 @@ export async function saveComponent(req: SaveRequest): Promise<SaveResult> {
     const result = await pool.query<{ slug: string }>(
       `
       INSERT INTO components (
-        slug, name, category, subcategory, type,
+        slug, owner_id, is_public, name, category, subcategory, type,
         tags, dependencies, source, html_source, css_source
       )
-      VALUES ($1, $2, $3, $4, $5, $6::text[], $7::text[], $8, $9, $10)
-      ON CONFLICT (slug) DO NOTHING
+      VALUES ($1, $2, FALSE, $3, $4, $5, $6, $7::text[], $8::text[], $9, $10, $11)
+      ON CONFLICT DO NOTHING
       RETURNING slug
       `,
       [
         componentDir,
+        userId,
         name,
         category,
         subcategory,
@@ -347,16 +432,29 @@ export async function saveComponent(req: SaveRequest): Promise<SaveResult> {
   }
 }
 
-export async function listComponents(): Promise<ComponentCatalogItem[]> {
+export async function listComponents(userId: string, tier: UserTier): Promise<ComponentCatalogItem[]> {
   await initStore();
+  await claimLegacyComponentsForUser(userId);
 
+  const includePublic = tier === 'library' || tier === 'pro';
   const result = await pool.query<DbComponentRow>(`
     SELECT
       slug, name, category, subcategory, type,
       tags, dependencies, source, html_source, css_source
     FROM components
+    WHERE owner_id = $1
+      OR (
+        $2::boolean = TRUE
+        AND is_public = TRUE
+        AND NOT EXISTS (
+          SELECT 1
+          FROM components own
+          WHERE own.owner_id = $1
+            AND own.slug = components.slug
+        )
+      )
     ORDER BY created_at DESC, id DESC
-  `);
+  `, [userId, includePublic]);
 
   return result.rows.map(mapRowToCatalogItem);
 }
@@ -366,15 +464,15 @@ type ComponentSourceRecord = {
   source: string;
 };
 
-async function getComponentSource(filePath: string): Promise<ComponentSourceRecord | null> {
+async function getComponentSource(filePath: string, userId: string): Promise<ComponentSourceRecord | null> {
   await initStore();
 
   const slug = slugFromFilePath(filePath);
   if (!slug || slug.includes('..')) return null;
 
   const result = await pool.query<ComponentSourceRecord>(
-    'SELECT id, source FROM components WHERE slug = $1',
-    [slug],
+    'SELECT id, source FROM components WHERE slug = $1 AND owner_id = $2 LIMIT 1',
+    [slug, userId],
   );
 
   return result.rows[0] ?? null;
@@ -387,8 +485,8 @@ export type PostprocessServiceResult = {
   parseResult: ParseCheckResult;
 };
 
-export async function postprocessComponent(filePath: string): Promise<PostprocessServiceResult> {
-  const record = await getComponentSource(filePath);
+export async function postprocessComponent(filePath: string, userId: string): Promise<PostprocessServiceResult> {
+  const record = await getComponentSource(filePath, userId);
   if (!record) {
     return {
       found: false,

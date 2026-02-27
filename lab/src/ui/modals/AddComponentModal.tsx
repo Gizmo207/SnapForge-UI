@@ -21,7 +21,9 @@ export function AddComponentModal({ onClose, showToast, onSaved }: AddComponentM
           <div style={{ fontSize: 16, fontWeight: 600 }}>Add Component</div>
           <button onClick={onClose} style={s.modalClose}>x</button>
         </div>
-        <AddComponentForm onClose={onClose} showToast={showToast} onSaved={onSaved} />
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <AddComponentForm onClose={onClose} showToast={showToast} onSaved={onSaved} />
+        </div>
       </div>
     </div>
   )

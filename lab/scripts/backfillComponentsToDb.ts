@@ -128,7 +128,9 @@ async function ensureSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS components (
       id BIGSERIAL PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
+      slug TEXT NOT NULL,
+      owner_id UUID,
+      is_public BOOLEAN NOT NULL DEFAULT FALSE,
       name TEXT NOT NULL,
       category TEXT NOT NULL,
       subcategory TEXT NOT NULL,
@@ -141,6 +143,33 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE components
+    ADD COLUMN IF NOT EXISTS owner_id UUID;
+  `);
+
+  await pool.query(`
+    ALTER TABLE components
+    ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+
+  await pool.query(`
+    ALTER TABLE components
+    DROP CONSTRAINT IF EXISTS components_slug_key;
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_components_owner_slug_unique
+    ON components (owner_id, slug)
+    WHERE owner_id IS NOT NULL;
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_components_public_slug_unique
+    ON components (slug)
+    WHERE owner_id IS NULL;
   `);
 
   await pool.query(`
@@ -196,7 +225,7 @@ async function backfill() {
 
     try {
       const existing = await pool.query<{ id: number }>(
-        'SELECT id FROM components WHERE slug = $1',
+        'SELECT id FROM components WHERE slug = $1 AND owner_id IS NULL LIMIT 1',
         [componentDir],
       );
 
@@ -204,10 +233,10 @@ async function backfill() {
         await pool.query(
           `
           INSERT INTO components (
-            slug, name, category, subcategory, type,
+            slug, owner_id, is_public, name, category, subcategory, type,
             tags, dependencies, source, html_source, css_source
           )
-          VALUES ($1, $2, $3, $4, $5, $6::text[], $7::text[], $8, $9, $10)
+          VALUES ($1, NULL, TRUE, $2, $3, $4, $5, $6::text[], $7::text[], $8, $9, $10)
           `,
           [
             componentDir,
@@ -228,6 +257,7 @@ async function backfill() {
           `
           UPDATE components
           SET
+            is_public = TRUE,
             name = $2,
             category = $3,
             subcategory = $4,
@@ -237,7 +267,7 @@ async function backfill() {
             source = $8,
             html_source = $9,
             css_source = $10
-          WHERE slug = $1
+          WHERE slug = $1 AND owner_id IS NULL
           `,
           [
             componentDir,
