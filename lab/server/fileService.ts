@@ -57,6 +57,35 @@ const pool = new Pool({
 
 let initPromise: Promise<void> | null = null;
 
+async function assertOwnerScopedComponentsSchema(): Promise<void> {
+  const ownerColumnResult = await pool.query<{ is_nullable: 'YES' | 'NO' }>(`
+    SELECT is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'components'
+      AND column_name = 'owner_id'
+    LIMIT 1
+  `);
+
+  const ownerColumn = ownerColumnResult.rows[0];
+  if (!ownerColumn) {
+    throw new Error('Schema invalid: components.owner_id column is missing');
+  }
+  if (ownerColumn.is_nullable !== 'NO') {
+    throw new Error('Schema invalid: components.owner_id must be NOT NULL');
+  }
+
+  const orphanResult = await pool.query<{ count: string }>(`
+    SELECT COUNT(*)::text AS count
+    FROM components
+    WHERE owner_id IS NULL
+  `);
+  const orphanCount = Number(orphanResult.rows[0]?.count ?? '0');
+  if (orphanCount > 0) {
+    throw new Error(`Schema invalid: found ${orphanCount} component rows without owner_id`);
+  }
+}
+
 export async function initStore(): Promise<void> {
   if (initPromise) return initPromise;
 
@@ -65,7 +94,7 @@ export async function initStore(): Promise<void> {
       CREATE TABLE IF NOT EXISTS components (
         id BIGSERIAL PRIMARY KEY,
         slug TEXT NOT NULL,
-        owner_id UUID NOT NULL,
+        owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         is_public BOOLEAN NOT NULL DEFAULT FALSE,
         name TEXT NOT NULL,
         category TEXT NOT NULL,
@@ -100,6 +129,22 @@ export async function initStore(): Promise<void> {
     await pool.query(`
       ALTER TABLE components
       ALTER COLUMN owner_id SET NOT NULL;
+    `);
+
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'components_owner_id_fkey'
+            AND conrelid = 'components'::regclass
+        ) THEN
+          ALTER TABLE components
+          ADD CONSTRAINT components_owner_id_fkey
+          FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
     `);
 
     await pool.query(`
@@ -177,6 +222,8 @@ export async function initStore(): Promise<void> {
         );
       }
     }
+
+    await assertOwnerScopedComponentsSchema();
 
   })();
 
