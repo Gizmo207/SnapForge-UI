@@ -57,6 +57,15 @@ type ComponentCatalogItem = {
   }
 }
 
+function normalizeSubcategory(value: string | undefined): string | undefined {
+  if (!value) return value
+  const key = value.trim().toLowerCase()
+  if (key === 'radio' || key === 'radios' || key === 'radiobutton' || key === 'radiobuttons' || key === 'radio-button') {
+    return 'radio-buttons'
+  }
+  return value
+}
+
 export class ApiError extends Error {
   status: number
   data: unknown
@@ -104,7 +113,12 @@ export async function fetchComponents(): Promise<RegistryItem[]> {
         source: item.source,
         htmlSource: item.htmlSource,
         cssSource: item.cssSource,
-        meta: item.meta,
+        meta: item.meta
+          ? {
+              ...item.meta,
+              subcategory: normalizeSubcategory(item.meta.subcategory) || item.meta.subcategory,
+            }
+          : item.meta,
       }))
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error('Failed to fetch components')

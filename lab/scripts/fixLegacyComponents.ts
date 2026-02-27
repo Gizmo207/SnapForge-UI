@@ -7,6 +7,15 @@ type ComponentRow = {
   subcategory: string;
 };
 
+const SUBCATEGORY_ALIASES: Record<string, string> = {
+  radio: 'radio-buttons',
+  radios: 'radio-buttons',
+  radiobutton: 'radio-buttons',
+  radiobuttons: 'radio-buttons',
+  'radio-button': 'radio-buttons',
+  'radio-buttons': 'radio-buttons',
+};
+
 const DATABASE_URL = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
@@ -30,7 +39,7 @@ async function main() {
 
   for (const row of rows.rows) {
     const nextSource = sanitize(row.source || '').source;
-    const nextSubcategory = row.subcategory === 'radios' ? 'radio-buttons' : row.subcategory;
+    const nextSubcategory = SUBCATEGORY_ALIASES[row.subcategory] ?? row.subcategory;
     const sourceChanged = nextSource !== row.source;
     const subcategoryChanged = nextSubcategory !== row.subcategory;
 
@@ -62,4 +71,3 @@ main()
   .finally(async () => {
     await pool.end();
   });
-

@@ -152,7 +152,7 @@ export async function initStore(): Promise<void> {
     await pool.query(`
       UPDATE components
       SET subcategory = 'radio-buttons'
-      WHERE subcategory = 'radios';
+      WHERE subcategory IN ('radio', 'radios', 'radiobutton', 'radiobuttons', 'radio-button');
     `);
 
     // Backfill sanitize for legacy source rows so old invalid JSX style keys don't break preview.
@@ -334,8 +334,22 @@ type DbComponentRow = {
   css_source: string | null;
 };
 
+const SUBCATEGORY_ALIASES: Record<string, string> = {
+  radio: 'radio-buttons',
+  radios: 'radio-buttons',
+  radiobutton: 'radio-buttons',
+  radiobuttons: 'radio-buttons',
+  'radio-button': 'radio-buttons',
+  'radio-buttons': 'radio-buttons',
+};
+
+function canonicalizeSubcategory(value: string): string {
+  return SUBCATEGORY_ALIASES[value] ?? value;
+}
+
 function mapRowToCatalogItem(row: DbComponentRow): ComponentCatalogItem {
   const sanitizedSource = sanitize(row.source).source;
+  const normalizedSubcategory = canonicalizeSubcategory(row.subcategory);
   return {
     path: `${row.slug}/react.tsx`,
     componentDir: row.slug,
@@ -345,7 +359,7 @@ function mapRowToCatalogItem(row: DbComponentRow): ComponentCatalogItem {
     meta: {
       name: row.name,
       category: row.category,
-      subcategory: row.subcategory,
+      subcategory: normalizedSubcategory,
       type: row.type,
       tags: row.tags ?? [],
       dependencies: row.dependencies ?? [],
@@ -383,7 +397,7 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
   const detectedFramework = detectFramework(req.code);
   const category = normalizeSegment(req.category, 'components');
   const rawSubcategory = normalizeSegment(req.subcategory, 'misc');
-  const subcategory = rawSubcategory === 'radios' ? 'radio-buttons' : rawSubcategory;
+  const subcategory = canonicalizeSubcategory(rawSubcategory);
   const name = req.name.trim() || 'Component';
   const fileName = normalizeName(name) || 'component';
   const componentDir = `${category}/${subcategory}/${fileName}`;
