@@ -41,7 +41,10 @@ export function DetailModal({
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(item.component)
-  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '', themeMode)
+  const previewThemeSource = framework === 'html'
+    ? `${item.htmlSource || ''}\n${item.cssSource || ''}`
+    : (item.source || '')
+  const previewTheme = inferPreviewTheme(item.meta?.tags || [], previewThemeSource, themeMode)
   const srcDoc = hasReactPreview
     ? generateReactPreviewHtml(item.source || '', previewId, previewTheme)
     : hasHtmlPreview

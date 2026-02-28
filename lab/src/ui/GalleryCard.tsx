@@ -29,7 +29,10 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
   const hasReactPreview = framework === 'react' && Boolean(item.source) && !isUnsafePreviewSource(item.source || '')
   const hasHtmlPreview = framework === 'html' && Boolean(item.htmlSource)
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(Component)
-  const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '', themeMode)
+  const previewThemeSource = framework === 'html'
+    ? `${item.htmlSource || ''}\n${item.cssSource || ''}`
+    : (item.source || '')
+  const previewTheme = inferPreviewTheme(item.meta?.tags || [], previewThemeSource, themeMode)
   const srcDoc = hasReactPreview
     ? generateReactPreviewHtml(item.source || '', previewId, previewTheme, 'gallery')
     : hasHtmlPreview
