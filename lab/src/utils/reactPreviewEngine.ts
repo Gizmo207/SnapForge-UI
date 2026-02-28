@@ -49,7 +49,18 @@ function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
       transform-origin: center;
+    }
+    .preview-content {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 100%;
+      max-height: 100%;
+      margin: 0 auto;
+      flex: 0 0 auto;
     }
     .preview-center > * {
       max-width: 100%;
@@ -81,14 +92,60 @@ export function inferPreviewTheme(tags: string[] = [], source = '', _appThemeMod
   if (darkSignals.some((signal) => tagSet.has(signal))) return 'dark'
   if (lightSignals.some((signal) => tagSet.has(signal))) return 'light'
 
-  const hasExplicitDarkBackground =
-    /background(?:-color)?\s*:\s*(?:black|#000(?:000)?|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,)/i.test(src)
-  const hasExplicitLightBackground =
-    /background(?:-color)?\s*:\s*(?:white|#fff(?:fff)?|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,)/i.test(src)
-
-  if (hasExplicitDarkBackground) return 'dark'
-  if (hasExplicitLightBackground) return 'light'
+  const backgroundTone = detectBackgroundTone(src)
+  if (backgroundTone) return backgroundTone
   return 'neutral'
+}
+
+function detectBackgroundTone(source: string): PreviewTheme | null {
+  const declarations = source.match(/background(?:-color)?\s*:\s*([^;]+)/gi) || []
+  for (const declaration of declarations) {
+    const value = declaration.split(':').slice(1).join(':').trim()
+    const color = extractColorToken(value)
+    if (!color) continue
+    const rgb = parseColorToken(color)
+    if (!rgb) continue
+    const luminance = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
+    if (luminance <= 0.35) return 'dark'
+    if (luminance >= 0.82) return 'light'
+  }
+  return null
+}
+
+function extractColorToken(value: string): string | null {
+  const match = value.match(/#(?:[0-9a-f]{3}|[0-9a-f]{6})\b|rgba?\([^)]+\)|\b(?:black|white)\b/i)
+  return match ? match[0] : null
+}
+
+function parseColorToken(token: string): [number, number, number] | null {
+  const lower = token.toLowerCase()
+  if (lower === 'black') return [0, 0, 0]
+  if (lower === 'white') return [255, 255, 255]
+
+  if (lower.startsWith('#')) {
+    const hex = lower.slice(1)
+    if (hex.length === 3) {
+      return [
+        Number.parseInt(hex[0] + hex[0], 16),
+        Number.parseInt(hex[1] + hex[1], 16),
+        Number.parseInt(hex[2] + hex[2], 16),
+      ]
+    }
+    if (hex.length === 6) {
+      return [
+        Number.parseInt(hex.slice(0, 2), 16),
+        Number.parseInt(hex.slice(2, 4), 16),
+        Number.parseInt(hex.slice(4, 6), 16),
+      ]
+    }
+    return null
+  }
+
+  const rgbMatch = lower.match(/rgba?\(([^)]+)\)/)
+  if (!rgbMatch) return null
+  const parts = rgbMatch[1].split(',').map((part) => Number.parseFloat(part.trim()))
+  if (parts.length < 3 || parts.slice(0, 3).some((part) => Number.isNaN(part))) return null
+  return [parts[0], parts[1], parts[2]]
 }
 
 function buildResizeScript(previewId: string): string {
@@ -306,7 +363,7 @@ export function generateHtmlPreviewHtml(
   layout: PreviewLayout = 'modal',
 ): string {
   const bodyClass = `preview-theme-${theme}`
-  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center">${htmlSource}</div></div></div>
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center"><div class="preview-content">${htmlSource}</div></div></div></div>
   <script>
   ${buildResizeScript(previewId)}
   setTimeout(function() {
