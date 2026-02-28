@@ -17,8 +17,7 @@ function serializeForTemplate(input: string): string {
 }
 
 function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
-  const canvasPadding = layout === 'gallery' ? 14 : 22
-  const centerMinHeight = layout === 'gallery' ? 140 : 160
+  const stagePadding = layout === 'gallery' ? 14 : 22
   return `
     html, body, #preview-root {
       width: 100%;
@@ -31,59 +30,38 @@ function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
       overflow: hidden;
       font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
-    .preview-canvas {
+    .preview-stage {
+      position: relative;
       width: 100%;
       height: 100%;
       min-height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: ${canvasPadding}px;
+      display: grid;
+      place-items: center;
+      padding: ${stagePadding}px;
       overflow: hidden;
       box-sizing: border-box;
     }
-    .preview-center {
-      width: 100%;
-      height: 100%;
-      min-height: ${centerMinHeight}px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .preview-inner {
       position: relative;
-      transform-origin: center;
-    }
-    .preview-content {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      max-width: 100%;
-      max-height: 100%;
-      margin: 0 auto;
-      flex: 0 0 auto;
-    }
-    .preview-slot {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-      transform-origin: top left;
-    }
-    .preview-center > * {
+      display: inline-block;
       max-width: 100%;
       max-height: 100%;
       margin: 0 auto;
     }
-    .preview-theme-light .preview-canvas {
+    .preview-inner > * {
+      max-width: 100%;
+      max-height: 100%;
+      margin: 0 auto;
+    }
+    .preview-theme-light .preview-stage {
       background: #ffffff;
       color: #0f172a;
     }
-    .preview-theme-neutral .preview-canvas {
+    .preview-theme-neutral .preview-stage {
       background: #e5e7eb;
       color: #0f172a;
     }
-    .preview-theme-dark .preview-canvas {
+    .preview-theme-dark .preview-stage {
       background: #0f1117;
       color: #e5e7eb;
     }
@@ -176,7 +154,7 @@ function buildResizeScript(previewId: string): string {
         );
       }
       function __snapforgeReportSize() {
-        const stage = document.querySelector('.preview-canvas');
+        const stage = document.querySelector('.preview-stage');
         const stageHeight = stage && stage.scrollHeight ? stage.scrollHeight : 0;
         const bodyHeight = document.body ? document.body.scrollHeight : 0;
         const docHeight = document.documentElement ? document.documentElement.scrollHeight : 0;
@@ -260,8 +238,8 @@ export function generateReactPreviewHtml(
     </head>
     <body class="${bodyClass}">
       <div id="preview-root">
-        <div class="preview-canvas">
-          <div id="root" class="preview-center"></div>
+        <div class="preview-stage">
+          <div id="root" class="preview-inner"></div>
         </div>
       </div>
 
@@ -273,8 +251,8 @@ export function generateReactPreviewHtml(
           const docEl = document.documentElement;
           const body = document.body;
           const previewRoot = document.getElementById('preview-root');
-          const canvas = document.querySelector('.preview-canvas');
-          const center = document.getElementById('root');
+          const stage = document.querySelector('.preview-stage');
+          const inner = document.getElementById('root');
 
           if (docEl) {
             docEl.style.width = '100%';
@@ -289,22 +267,19 @@ export function generateReactPreviewHtml(
             if (!previewRoot.style.width) previewRoot.style.width = '100%';
             if (!previewRoot.style.height) previewRoot.style.height = '100%';
           }
-          if (canvas instanceof HTMLElement) {
-            if (!canvas.style.width) canvas.style.width = '100%';
-            if (!canvas.style.height) canvas.style.height = '100%';
-            if (!canvas.style.minHeight) canvas.style.minHeight = '120px';
-            if (!canvas.style.display) canvas.style.display = 'flex';
-            if (!canvas.style.alignItems) canvas.style.alignItems = 'center';
-            if (!canvas.style.justifyContent) canvas.style.justifyContent = 'center';
-            if (!canvas.style.boxSizing) canvas.style.boxSizing = 'border-box';
+          if (stage instanceof HTMLElement) {
+            if (!stage.style.width) stage.style.width = '100%';
+            if (!stage.style.height) stage.style.height = '100%';
+            if (!stage.style.minHeight) stage.style.minHeight = '120px';
+            if (!stage.style.display) stage.style.display = 'grid';
+            if (!stage.style.placeItems) stage.style.placeItems = 'center';
+            if (!stage.style.boxSizing) stage.style.boxSizing = 'border-box';
           }
-          if (center instanceof HTMLElement) {
-            if (!center.style.width) center.style.width = '100%';
-            if (!center.style.height) center.style.height = '100%';
-            if (!center.style.minHeight) center.style.minHeight = '160px';
-            if (!center.style.display) center.style.display = 'flex';
-            if (!center.style.alignItems) center.style.alignItems = 'center';
-            if (!center.style.justifyContent) center.style.justifyContent = 'center';
+          if (inner instanceof HTMLElement) {
+            if (!inner.style.position) inner.style.position = 'relative';
+            if (!inner.style.display) inner.style.display = 'inline-block';
+            if (!inner.style.maxWidth) inner.style.maxWidth = '100%';
+            if (!inner.style.maxHeight) inner.style.maxHeight = '100%';
           }
         };
         window.__snapforgeEnsureLayoutFallback();
@@ -318,38 +293,9 @@ export function generateReactPreviewHtml(
 
         const Component = exports.default || Object.values(exports)[0];
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        function __snapforgeNudgeCollapsedRoot() {
-          if (typeof window.__snapforgeEnsureLayoutFallback === 'function') {
-            window.__snapforgeEnsureLayoutFallback();
-          }
-          const mount = document.getElementById('root');
-          const first = mount ? mount.firstElementChild : null;
-          if (!first) return;
-          const rect = first.getBoundingClientRect ? first.getBoundingClientRect() : null;
-          if (!rect || rect.width >= 2 && rect.height >= 2) return;
-
-          if (first instanceof HTMLElement) {
-            if (!first.style.width) first.style.width = '100%';
-            if (!first.style.height) first.style.height = '100%';
-            __snapforgeReportSize();
-            return;
-          }
-
-          if (first instanceof SVGElement) {
-            if (!first.getAttribute('width')) first.setAttribute('width', '100%');
-            if (!first.getAttribute('height')) first.setAttribute('height', '100%');
-            __snapforgeReportSize();
-          }
-        }
         try {
           if (Component) {
             root.render(React.createElement(Component));
-            if (window.requestAnimationFrame) {
-              window.requestAnimationFrame(__snapforgeNudgeCollapsedRoot);
-            } else {
-              setTimeout(__snapforgeNudgeCollapsedRoot, 30);
-            }
-            setTimeout(__snapforgeNudgeCollapsedRoot, 140);
             setTimeout(function() {
               if (typeof window.__snapforgeMarkReady === 'function') {
                 window.__snapforgeMarkReady();
@@ -377,77 +323,9 @@ export function generateHtmlPreviewHtml(
   layout: PreviewLayout = 'modal',
 ): string {
   const bodyClass = `preview-theme-${theme}`
-  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center"><div class="preview-content"><div class="preview-slot">${htmlSource}</div></div></div></div></div>
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-stage"><div class="preview-inner">${htmlSource}</div></div></div>
   <script>
   ${buildResizeScript(previewId)}
-  function __snapforgeRepairHtmlPreview() {
-    const content = document.querySelector('.preview-content');
-    const slot = document.querySelector('.preview-slot');
-    const root = slot && slot.firstElementChild;
-    if (!(content instanceof HTMLElement) || !(slot instanceof HTMLElement) || !(root instanceof HTMLElement)) return;
-
-    const descendants = [root, ...Array.from(root.querySelectorAll('*'))];
-    const measurable = descendants.filter((node) => {
-      if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) return false;
-      const rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
-      return Boolean(rect && (rect.width > 0 || rect.height > 0));
-    });
-
-    const hasAbsoluteDescendants = descendants.some((node) => {
-      return node instanceof HTMLElement && window.getComputedStyle(node).position === 'absolute';
-    });
-
-    const rootStyle = window.getComputedStyle(root);
-    if (hasAbsoluteDescendants && rootStyle.position === 'static') {
-      root.style.position = 'relative';
-    }
-
-    const slotRect = slot.getBoundingClientRect ? slot.getBoundingClientRect() : null;
-    const needsRepair = hasAbsoluteDescendants || !slotRect || slotRect.width < 8 || slotRect.height < 8;
-    if (!needsRepair || measurable.length === 0) {
-      __snapforgeReportSize();
-      return;
-    }
-
-    let minLeft = Number.POSITIVE_INFINITY;
-    let minTop = Number.POSITIVE_INFINITY;
-    let maxRight = Number.NEGATIVE_INFINITY;
-    let maxBottom = Number.NEGATIVE_INFINITY;
-
-    for (const node of measurable) {
-      const rect = node.getBoundingClientRect();
-      minLeft = Math.min(minLeft, rect.left);
-      minTop = Math.min(minTop, rect.top);
-      maxRight = Math.max(maxRight, rect.right);
-      maxBottom = Math.max(maxBottom, rect.bottom);
-    }
-
-    if (!Number.isFinite(minLeft) || !Number.isFinite(minTop) || !Number.isFinite(maxRight) || !Number.isFinite(maxBottom)) {
-      __snapforgeReportSize();
-      return;
-    }
-
-    const width = Math.max(1, Math.ceil(maxRight - minLeft));
-    const height = Math.max(1, Math.ceil(maxBottom - minTop));
-    const anchorLeft = slotRect ? slotRect.left : minLeft;
-    const anchorTop = slotRect ? slotRect.top : minTop;
-    const offsetX = Math.round(anchorLeft - minLeft);
-    const offsetY = Math.round(anchorTop - minTop);
-
-    content.style.width = width + 'px';
-    content.style.height = height + 'px';
-    slot.style.width = width + 'px';
-    slot.style.height = height + 'px';
-    slot.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
-
-    __snapforgeReportSize();
-  }
-  if (window.requestAnimationFrame) {
-    window.requestAnimationFrame(__snapforgeRepairHtmlPreview);
-  } else {
-    setTimeout(__snapforgeRepairHtmlPreview, 30);
-  }
-  setTimeout(__snapforgeRepairHtmlPreview, 120);
   setTimeout(function() {
     if (typeof window.__snapforgeMarkReady === 'function') {
       window.__snapforgeMarkReady();
