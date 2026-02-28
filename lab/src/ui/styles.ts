@@ -127,8 +127,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: 20,
+    gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+    gap: 28,
   },
   card: {
     position: 'relative' as const,
@@ -144,7 +144,8 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: 190,
+    width: '100%',
+    aspectRatio: '4 / 3',
     background: 'var(--surface-preview)',
     position: 'relative' as const,
     overflow: 'hidden' as const,

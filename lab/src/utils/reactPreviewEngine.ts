@@ -71,7 +71,7 @@ function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
   `
 }
 
-export function inferPreviewTheme(tags: string[] = [], source = '', appThemeMode?: AppThemeMode): PreviewTheme {
+export function inferPreviewTheme(tags: string[] = [], source = '', _appThemeMode?: AppThemeMode): PreviewTheme {
   const tagSet = new Set(tags.map((tag) => tag.toLowerCase()))
   const src = source.toLowerCase()
 
@@ -88,8 +88,6 @@ export function inferPreviewTheme(tags: string[] = [], source = '', appThemeMode
 
   if (hasExplicitDarkBackground) return 'dark'
   if (hasExplicitLightBackground) return 'light'
-  if (appThemeMode === 'dark') return 'dark'
-  if (appThemeMode === 'light') return 'light'
   return 'neutral'
 }
 

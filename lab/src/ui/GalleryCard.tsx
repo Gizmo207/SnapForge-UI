@@ -9,8 +9,6 @@ import {
 } from '../utils/reactPreviewEngine'
 import { s } from './styles'
 
-const GALLERY_PREVIEW_FRAME_HEIGHT = 288
-
 type GalleryCardProps = {
   item: RegistryItem
   themeMode: 'dark' | 'light'
@@ -40,7 +38,7 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
   const baseBorderColor = themeMode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.1)'
   const hoverBorderColor = themeMode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.16)'
   const baseShadow = themeMode === 'dark'
-    ? '0 14px 34px rgba(0,0,0,0.18)'
+    ? '0 10px 24px rgba(0,0,0,0.16)'
     : '0 14px 28px rgba(15,23,42,0.08)'
 
   useEffect(() => {
@@ -82,8 +80,8 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
         ...s.card,
         cursor: exportMode ? 'pointer' : 'default',
         borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? hoverBorderColor : baseBorderColor,
-        transform: hovered ? 'translateY(-3px) scale(1.008)' : 'translateY(0) scale(1)',
-        boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 20px 40px rgba(0,0,0,0.28)' : baseShadow,
+        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
+        boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 16px 30px rgba(0,0,0,0.22)' : baseShadow,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -101,7 +99,7 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
           {exportChecked ? '✓' : ''}
         </div>
       )}
-      <div style={{ ...s.cardPreview, height: srcDoc ? GALLERY_PREVIEW_FRAME_HEIGHT : s.cardPreview.height }}>
+      <div style={s.cardPreview}>
         {srcDoc ? (
           <>
             <iframe
@@ -110,7 +108,7 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
               srcDoc={srcDoc}
               style={{
                 width: '100%',
-                height: GALLERY_PREVIEW_FRAME_HEIGHT,
+                height: '100%',
                 border: 'none',
                 borderRadius: 0,
                 background: previewTheme === 'light' ? '#ffffff' : previewTheme === 'dark' ? '#0f1117' : '#e5e7eb',
