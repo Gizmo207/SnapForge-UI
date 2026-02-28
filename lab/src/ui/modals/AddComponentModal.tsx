@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type React from 'react'
-import { parseComponent } from '../../parser/parseComponent'
 import { ValidationBadge, ValidationPanel, type PostprocessResult } from '../../components/ValidationStatus'
 import { copyToClipboard } from '../../services/clipboardService'
 import { ApiError, postprocessComponent, saveComponent } from '../../services/fileServiceClient'
 import { isUnsafePreviewSource } from '../../utils/reactPreviewEngine'
 import { s } from '../styles'
+import { CATEGORY_ORDER, formatTaxonomyLabel, getSubcategoryOptions } from '../../data/componentTaxonomy'
+import { classifyComponent } from '../../parser/classifyComponent'
+import { detectDependencies } from '../../parser/detectDependencies'
+import { detectFramework } from '../../parser/detectFramework'
+import { inferName } from '../../parser/inferName'
 
 type AddComponentModalProps = {
   onClose: () => void
@@ -13,10 +17,17 @@ type AddComponentModalProps = {
   onSaved?: () => void
 }
 
+type AnalysisSummary = {
+  framework: 'react' | 'html'
+  tags: string[]
+  dependencies: string[]
+  suggestedName: string
+}
+
 export function AddComponentModal({ onClose, showToast, onSaved }: AddComponentModalProps) {
   return (
     <div style={s.overlay} onClick={onClose}>
-      <div style={{ ...s.modal, maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...s.modal, maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div style={s.modalHeader}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Add Component</div>
           <button onClick={onClose} style={s.modalClose}>x</button>
@@ -39,35 +50,67 @@ function AddComponentForm({
   onSaved?: () => void
 }) {
   const [name, setName] = useState('')
+  const [category, setCategory] = useState('')
+  const [subcategory, setSubcategory] = useState('')
   const [code, setCode] = useState('')
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewCss, setPreviewCss] = useState('')
-  const [parsed, setParsed] = useState<ReturnType<typeof parseComponent> | null>(null)
   const [postprocessResult, setPostprocessResult] = useState<PostprocessResult | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const handleAnalyze = () => {
-    if (!code.trim()) return
-    const result = parseComponent(code)
-    setParsed(result)
+  const subcategoryOptions = getSubcategoryOptions(category)
+
+  const analysis = useMemo<AnalysisSummary | null>(() => {
+    if (!code.trim() || !category || !subcategory) return null
+
+    const framework = detectFramework(code)
+    const tags = classifyComponent(code).tags
+    const dependencies = detectDependencies(code)
+    const suggestedName = inferName(code, { category, subcategory, tags })
+
+    return {
+      framework,
+      tags,
+      dependencies,
+      suggestedName,
+    }
+  }, [category, code, subcategory])
+
+  const handleCategoryChange = (value: string) => {
+    setCategory(value)
+    const options = getSubcategoryOptions(value)
+    setSubcategory(options[0] ?? '')
   }
 
   const handleConfirm = async () => {
-    if (!parsed || saving) return
+    if (!code.trim() || !category || !subcategory || saving) return
 
-    if (parsed.framework === 'react' && isUnsafePreviewSource(code)) {
+    const summary = analysis ?? {
+      framework: detectFramework(code),
+      tags: classifyComponent(code).tags,
+      dependencies: detectDependencies(code),
+      suggestedName: inferName(code, { category, subcategory, tags: [] }),
+    }
+
+    if (summary.framework === 'react' && isUnsafePreviewSource(code)) {
       showToast('Blocked: preview source contains restricted tokens (<script, window., document., eval().', 'error')
       return
     }
 
     setSaving(true)
+
     const payload = {
-      ...parsed,
-      name: name || parsed.name,
+      framework: summary.framework,
+      name: name.trim() || summary.suggestedName,
+      category,
+      subcategory,
+      tags: summary.tags,
+      dependencies: summary.dependencies,
       code,
-      htmlSource: parsed.framework === 'html' ? (previewHtml.trim() || undefined) : undefined,
-      cssSource: parsed.framework === 'html' ? (previewCss.trim() || undefined) : undefined,
+      htmlSource: summary.framework === 'html' ? (previewHtml.trim() || undefined) : undefined,
+      cssSource: summary.framework === 'html' ? (previewCss.trim() || undefined) : undefined,
     }
+
     let relativePath = ''
     try {
       const result = await saveComponent(payload)
@@ -78,7 +121,7 @@ function AddComponentForm({
         const data = typeof err.data === 'object' && err.data ? err.data as { errorCode?: string } : {}
         const duplicateCode = data.errorCode === 'DUPLICATE_SLUG' || err.message.toLowerCase().includes('already exists')
         if (duplicateCode) {
-          showToast('A component with that name already exists in this category. Rename it and save again.', 'error')
+          showToast('A component with that name already exists in this subcategory. Rename it and save again.', 'error')
           setSaving(false)
           return
         }
@@ -106,8 +149,6 @@ function AddComponentForm({
     }
   }
 
-  const handleBack = () => { setParsed(null); setPostprocessResult(null) }
-
   const handleCopyErrors = async (text: string) => {
     try {
       await copyToClipboard(text)
@@ -121,7 +162,7 @@ function AddComponentForm({
     return (
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={addStyles.detectedHeader}>Save Complete</div>
+          <div style={addStyles.sectionHeader}>Save Complete</div>
           <ValidationBadge result={postprocessResult} />
         </div>
         <ValidationPanel result={postprocessResult} onCopyErrors={handleCopyErrors} />
@@ -132,51 +173,32 @@ function AddComponentForm({
     )
   }
 
-  if (parsed) {
-    return (
-      <div style={{ padding: 20, display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
-        <div style={addStyles.detectedHeader}>Detected Classification</div>
-
-        <div style={addStyles.resultGrid}>
-          <DetectedRow label="Framework" value={parsed.framework} />
-          <DetectedRow label="Category" value={parsed.category} />
-          <DetectedRow label="Subcategory" value={parsed.subcategory} />
-          <div style={addStyles.resultRow}>
-            <span style={addStyles.resultLabel}>Tags</span>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const }}>
-              {parsed.tags.length > 0
-                ? parsed.tags.map((t) => <span key={t} style={addStyles.resultTag}>{t}</span>)
-                : <span style={{ fontSize: 12, opacity: 0.3 }}>none detected</span>
-              }
-            </div>
-          </div>
-          <div style={addStyles.resultRow}>
-            <span style={addStyles.resultLabel}>Dependencies</span>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const }}>
-              {parsed.dependencies.length > 0
-                ? parsed.dependencies.map((d) => <span key={d} style={{ ...addStyles.resultTag, background: 'rgba(100,200,255,0.12)', color: 'rgba(150,220,255,0.8)' }}>{d}</span>)
-                : <span style={{ fontSize: 12, opacity: 0.3 }}>none</span>
-              }
-            </div>
-          </div>
-          <DetectedRow label="Name" value={name || parsed.name} />
-        </div>
-
-        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-          <button style={s.submitBtn} onClick={handleConfirm}>
-            {saving ? 'Saving...' : 'Confirm & Save'}
-          </button>
-          <button style={addStyles.backBtn} onClick={handleBack}>
-            Edit
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div style={{ padding: 20, display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
-      <FormField label="Name (optional)" value={name} onChange={setName} placeholder="Auto-detected if left blank" />
+      <FormField label="Name (optional)" value={name} onChange={setName} placeholder={analysis?.suggestedName || 'Auto-detected if left blank'} />
+
+      <div style={addStyles.row}>
+        <SelectField
+          label="Category"
+          value={category}
+          onChange={handleCategoryChange}
+          options={CATEGORY_ORDER.map((value) => ({ value, label: formatTaxonomyLabel(value) }))}
+          placeholder="Choose a category"
+        />
+        <SelectField
+          label="Subcategory"
+          value={subcategory}
+          onChange={setSubcategory}
+          options={subcategoryOptions.map((value) => ({ value, label: formatTaxonomyLabel(value) }))}
+          placeholder={category ? 'Choose a subcategory' : 'Pick a category first'}
+          disabled={!category}
+        />
+      </div>
+
+      <div style={addStyles.selectionHint}>
+        Choose exactly where this component should live in the library. No auto-placement.
+      </div>
+
       <div>
         <div style={s.formLabel}>Code</div>
         <textarea
@@ -186,6 +208,7 @@ function AddComponentForm({
           style={{ ...s.formInput, minHeight: 200, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
         />
       </div>
+
       <div>
         <div style={s.formLabel}>Preview HTML (optional)</div>
         <textarea
@@ -195,6 +218,7 @@ function AddComponentForm({
           style={{ ...s.formInput, minHeight: 120, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
         />
       </div>
+
       <div>
         <div style={s.formLabel}>Preview CSS (optional)</div>
         <textarea
@@ -204,18 +228,67 @@ function AddComponentForm({
           style={{ ...s.formInput, minHeight: 100, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
         />
       </div>
-      <button style={s.submitBtn} onClick={handleAnalyze}>
-        Analyze Component
+
+      <div style={addStyles.summaryCard}>
+        <div style={addStyles.sectionHeader}>Save Summary</div>
+        <SummaryRow label="Framework" value={analysis?.framework || 'Waiting for code'} />
+        <SummaryRow
+          label="Location"
+          value={category && subcategory ? `${formatTaxonomyLabel(category)} / ${formatTaxonomyLabel(subcategory)}` : 'Choose a category and subcategory'}
+        />
+        <SummaryRow label="Saved name" value={name.trim() || analysis?.suggestedName || 'Waiting for code'} />
+        <div style={addStyles.resultRow}>
+          <span style={addStyles.resultLabel}>Dependencies</span>
+          <TagList
+            items={analysis?.dependencies || []}
+            emptyLabel="none"
+            styleOverride={{ background: 'rgba(100,200,255,0.12)', color: 'rgba(150,220,255,0.8)' }}
+          />
+        </div>
+        <div style={addStyles.resultRow}>
+          <span style={addStyles.resultLabel}>Tags</span>
+          <TagList items={analysis?.tags || []} emptyLabel="none detected" />
+        </div>
+      </div>
+
+      <button
+        style={s.submitBtn}
+        onClick={handleConfirm}
+        disabled={saving || !code.trim() || !category || !subcategory}
+      >
+        {saving ? 'Saving...' : 'Save Component'}
       </button>
     </div>
   )
 }
 
-function DetectedRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={addStyles.resultRow}>
       <span style={addStyles.resultLabel}>{label}</span>
       <span style={addStyles.resultValue}>{value}</span>
+    </div>
+  )
+}
+
+function TagList({
+  items,
+  emptyLabel,
+  styleOverride,
+}: {
+  items: string[]
+  emptyLabel: string
+  styleOverride?: React.CSSProperties
+}) {
+  if (items.length === 0) {
+    return <span style={{ fontSize: 12, opacity: 0.3 }}>{emptyLabel}</span>
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, justifyContent: 'flex-end' as const }}>
+      {items.map((item) => (
+        <span key={item} style={{ ...addStyles.resultTag, ...styleOverride }}>{item}</span>
+      ))}
     </div>
   )
 }
@@ -239,14 +312,57 @@ function FormField({ label, value, onChange, placeholder }: {
   )
 }
 
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  placeholder: string
+  disabled?: boolean
+}) {
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={s.formLabel}>{label}</div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={s.formInput}
+        disabled={disabled}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 const addStyles: Record<string, React.CSSProperties> = {
-  detectedHeader: {
+  row: {
+    display: 'flex',
+    gap: 12,
+  },
+  selectionHint: {
+    fontSize: 12,
+    color: 'var(--text-muted)',
+  },
+  sectionHeader: {
     fontSize: 13,
     fontWeight: 600,
     color: 'var(--brand-text)',
     letterSpacing: '0.02em',
   },
-  resultGrid: {
+  summaryCard: {
     background: 'var(--surface-input)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 12,
@@ -259,6 +375,7 @@ const addStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
   },
   resultLabel: {
     fontSize: 11,
@@ -271,6 +388,7 @@ const addStyles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     color: 'var(--text-secondary)',
     textTransform: 'capitalize' as const,
+    textAlign: 'right' as const,
   },
   resultTag: {
     fontSize: 10,
@@ -278,16 +396,5 @@ const addStyles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     background: 'var(--brand-bg)',
     color: 'var(--brand-text)',
-  },
-  backBtn: {
-    padding: '10px 20px',
-    fontSize: 13,
-    fontWeight: 500,
-    borderRadius: 10,
-    border: '1px solid var(--border-strong)',
-    background: 'var(--surface-button)',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    transition: 'background 0.15s',
   },
 }

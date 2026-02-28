@@ -10,6 +10,7 @@ import { AddComponentModal } from './ui/modals/AddComponentModal'
 import { ExportModal } from './ui/modals/ExportModal'
 import { Toast } from './ui/Toast'
 import { s } from './ui/styles'
+import { CATEGORY_ORDER } from './data/componentTaxonomy'
 import { copyToClipboard } from './services/clipboardService'
 import { confirmDialog } from './services/dialogService'
 import {
@@ -28,7 +29,6 @@ import {
   type ExportFramework,
 } from './pure/exportBundles'
 
-const CATEGORY_ORDER = ['foundations', 'primitives', 'components', 'patterns', 'layouts', 'pages']
 const MAX_VISIBLE_TAGS = 12
 
 function App() {
