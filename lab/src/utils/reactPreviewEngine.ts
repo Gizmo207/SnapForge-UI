@@ -5,6 +5,7 @@ export const PREVIEW_RESIZE_EVENT = 'SNAPFORGE_PREVIEW_RESIZE'
 export const PREVIEW_STATUS_EVENT = 'SNAPFORGE_PREVIEW_STATUS'
 export type PreviewTheme = 'light' | 'neutral' | 'dark'
 export type AppThemeMode = 'light' | 'dark'
+export type PreviewLayout = 'gallery' | 'modal'
 
 export function isUnsafePreviewSource(sourceCode: string): boolean {
   const lower = sourceCode.toLowerCase()
@@ -15,7 +16,9 @@ function serializeForTemplate(input: string): string {
   return JSON.stringify(input)
 }
 
-function getBasePreviewCss(): string {
+function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
+  const canvasPadding = layout === 'gallery' ? 14 : 22
+  const centerMinHeight = layout === 'gallery' ? 140 : 160
   return `
     html, body, #preview-root {
       width: 100%;
@@ -35,14 +38,14 @@ function getBasePreviewCss(): string {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 22px;
+      padding: ${canvasPadding}px;
       overflow: hidden;
       box-sizing: border-box;
     }
     .preview-center {
       width: 100%;
       height: 100%;
-      min-height: 160px;
+      min-height: ${centerMinHeight}px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -141,7 +144,12 @@ function buildResizeScript(previewId: string): string {
   `
 }
 
-export function generateReactPreviewHtml(sourceCode: string, previewId: string, theme: PreviewTheme = 'neutral'): string {
+export function generateReactPreviewHtml(
+  sourceCode: string,
+  previewId: string,
+  theme: PreviewTheme = 'neutral',
+  layout: PreviewLayout = 'modal',
+): string {
   const sanitizedSource = sanitize(sourceCode).source
   const withoutImports = sanitizedSource
     .split('\n')
@@ -179,7 +187,7 @@ export function generateReactPreviewHtml(sourceCode: string, previewId: string, 
       <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
       <script src="https://unpkg.com/styled-components/dist/styled-components.min.js"></script>
       <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-      <style>${getBasePreviewCss()}</style>
+      <style>${getBasePreviewCss(layout)}</style>
     </head>
     <body class="${bodyClass}">
       <div id="preview-root">
@@ -297,9 +305,10 @@ export function generateHtmlPreviewHtml(
   cssSource: string,
   previewId: string,
   theme: PreviewTheme = 'neutral',
+  layout: PreviewLayout = 'modal',
 ): string {
   const bodyClass = `preview-theme-${theme}`
-  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss()} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center">${htmlSource}</div></div></div>
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center">${htmlSource}</div></div></div>
   <script>
   ${buildResizeScript(previewId)}
   setTimeout(function() {

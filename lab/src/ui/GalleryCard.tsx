@@ -9,7 +9,7 @@ import {
 } from '../utils/reactPreviewEngine'
 import { s } from './styles'
 
-const GALLERY_PREVIEW_FRAME_HEIGHT = 248
+const GALLERY_PREVIEW_FRAME_HEIGHT = 288
 
 type GalleryCardProps = {
   item: RegistryItem
@@ -33,10 +33,15 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
   const hasPreview = hasReactPreview || hasHtmlPreview || Boolean(Component)
   const previewTheme = inferPreviewTheme(item.meta?.tags || [], item.source || item.htmlSource || '', themeMode)
   const srcDoc = hasReactPreview
-    ? generateReactPreviewHtml(item.source || '', previewId, previewTheme)
+    ? generateReactPreviewHtml(item.source || '', previewId, previewTheme, 'gallery')
     : hasHtmlPreview
-      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId, previewTheme)
+      ? generateHtmlPreviewHtml(item.htmlSource || '', item.cssSource || '', previewId, previewTheme, 'gallery')
       : undefined
+  const baseBorderColor = themeMode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.1)'
+  const hoverBorderColor = themeMode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.16)'
+  const baseShadow = themeMode === 'dark'
+    ? '0 14px 34px rgba(0,0,0,0.18)'
+    : '0 14px 28px rgba(15,23,42,0.08)'
 
   useEffect(() => {
     if (!srcDoc) {
@@ -76,9 +81,9 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
       style={{
         ...s.card,
         cursor: exportMode ? 'pointer' : 'default',
-        borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? 'var(--border-strong)' : 'var(--border-subtle)',
+        borderColor: exportChecked ? 'rgba(100,220,140,0.4)' : hovered ? hoverBorderColor : baseBorderColor,
         transform: hovered ? 'translateY(-3px) scale(1.008)' : 'translateY(0) scale(1)',
-        boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 12px 32px rgba(0,0,0,0.4)' : 'none',
+        boxShadow: exportChecked ? '0 0 20px rgba(100,220,140,0.1)' : hovered ? '0 20px 40px rgba(0,0,0,0.28)' : baseShadow,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -96,7 +101,7 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
           {exportChecked ? '✓' : ''}
         </div>
       )}
-      <div style={{ ...s.cardPreview, padding: srcDoc ? 12 : 0, height: srcDoc ? GALLERY_PREVIEW_FRAME_HEIGHT + 24 : s.cardPreview.height }}>
+      <div style={{ ...s.cardPreview, height: srcDoc ? GALLERY_PREVIEW_FRAME_HEIGHT : s.cardPreview.height }}>
         {srcDoc ? (
           <>
             <iframe
@@ -106,9 +111,8 @@ export function GalleryCard({ item, themeMode, exportMode, exportChecked, onExpo
               style={{
                 width: '100%',
                 height: GALLERY_PREVIEW_FRAME_HEIGHT,
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 10,
-                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+                border: 'none',
+                borderRadius: 0,
                 background: previewTheme === 'light' ? '#ffffff' : previewTheme === 'dark' ? '#0f1117' : '#e5e7eb',
                 pointerEvents: exportMode || previewLoading || Boolean(previewError) ? 'none' : 'auto',
               }}
