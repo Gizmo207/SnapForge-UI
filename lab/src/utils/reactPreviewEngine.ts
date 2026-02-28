@@ -62,6 +62,14 @@ function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
       margin: 0 auto;
       flex: 0 0 auto;
     }
+    .preview-slot {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      transform-origin: top left;
+    }
     .preview-center > * {
       max-width: 100%;
       max-height: 100%;
@@ -369,32 +377,68 @@ export function generateHtmlPreviewHtml(
   layout: PreviewLayout = 'modal',
 ): string {
   const bodyClass = `preview-theme-${theme}`
-  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center"><div class="preview-content">${htmlSource}</div></div></div></div>
+  return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center"><div class="preview-content"><div class="preview-slot">${htmlSource}</div></div></div></div></div>
   <script>
   ${buildResizeScript(previewId)}
   function __snapforgeRepairHtmlPreview() {
     const content = document.querySelector('.preview-content');
-    const root = content && content.firstElementChild;
-    if (!(root instanceof HTMLElement)) return;
+    const slot = document.querySelector('.preview-slot');
+    const root = slot && slot.firstElementChild;
+    if (!(content instanceof HTMLElement) || !(slot instanceof HTMLElement) || !(root instanceof HTMLElement)) return;
 
-    const rect = root.getBoundingClientRect ? root.getBoundingClientRect() : null;
-    const descendants = Array.from(root.querySelectorAll('*'));
+    const descendants = [root, ...Array.from(root.querySelectorAll('*'))];
+    const measurable = descendants.filter((node) => {
+      if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) return false;
+      const rect = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+      return Boolean(rect && (rect.width > 0 || rect.height > 0));
+    });
+
     const hasAbsoluteDescendants = descendants.some((node) => {
       return node instanceof HTMLElement && window.getComputedStyle(node).position === 'absolute';
     });
 
-    if (hasAbsoluteDescendants) {
-      const rootStyle = window.getComputedStyle(root);
-      if (rootStyle.position === 'static') {
-        root.style.position = 'relative';
-      }
-      if ((!rect || rect.width < 8) && !root.style.width) {
-        root.style.width = '160px';
-      }
-      if ((!rect || rect.height < 8) && !root.style.height) {
-        root.style.height = '120px';
-      }
+    const rootStyle = window.getComputedStyle(root);
+    if (hasAbsoluteDescendants && rootStyle.position === 'static') {
+      root.style.position = 'relative';
     }
+
+    const slotRect = slot.getBoundingClientRect ? slot.getBoundingClientRect() : null;
+    const needsRepair = hasAbsoluteDescendants || !slotRect || slotRect.width < 8 || slotRect.height < 8;
+    if (!needsRepair || measurable.length === 0) {
+      __snapforgeReportSize();
+      return;
+    }
+
+    let minLeft = Number.POSITIVE_INFINITY;
+    let minTop = Number.POSITIVE_INFINITY;
+    let maxRight = Number.NEGATIVE_INFINITY;
+    let maxBottom = Number.NEGATIVE_INFINITY;
+
+    for (const node of measurable) {
+      const rect = node.getBoundingClientRect();
+      minLeft = Math.min(minLeft, rect.left);
+      minTop = Math.min(minTop, rect.top);
+      maxRight = Math.max(maxRight, rect.right);
+      maxBottom = Math.max(maxBottom, rect.bottom);
+    }
+
+    if (!Number.isFinite(minLeft) || !Number.isFinite(minTop) || !Number.isFinite(maxRight) || !Number.isFinite(maxBottom)) {
+      __snapforgeReportSize();
+      return;
+    }
+
+    const width = Math.max(1, Math.ceil(maxRight - minLeft));
+    const height = Math.max(1, Math.ceil(maxBottom - minTop));
+    const anchorLeft = slotRect ? slotRect.left : minLeft;
+    const anchorTop = slotRect ? slotRect.top : minTop;
+    const offsetX = Math.round(anchorLeft - minLeft);
+    const offsetY = Math.round(anchorTop - minTop);
+
+    content.style.width = width + 'px';
+    content.style.height = height + 'px';
+    slot.style.width = width + 'px';
+    slot.style.height = height + 'px';
+    slot.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px)';
 
     __snapforgeReportSize();
   }
