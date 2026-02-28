@@ -94,6 +94,12 @@ export function inferPreviewTheme(tags: string[] = [], source = '', _appThemeMod
 
   const backgroundTone = detectBackgroundTone(src)
   if (backgroundTone) return backgroundTone
+
+  const looksLikeLoader =
+    tagSet.has('animation') ||
+    /\b(loader|spinner|domino|pulse|skeleton|progress)\b/i.test(src)
+
+  if (looksLikeLoader) return 'dark'
   return 'neutral'
 }
 
@@ -366,6 +372,38 @@ export function generateHtmlPreviewHtml(
   return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-canvas"><div class="preview-center"><div class="preview-content">${htmlSource}</div></div></div></div>
   <script>
   ${buildResizeScript(previewId)}
+  function __snapforgeRepairHtmlPreview() {
+    const content = document.querySelector('.preview-content');
+    const root = content && content.firstElementChild;
+    if (!(root instanceof HTMLElement)) return;
+
+    const rect = root.getBoundingClientRect ? root.getBoundingClientRect() : null;
+    const descendants = Array.from(root.querySelectorAll('*'));
+    const hasAbsoluteDescendants = descendants.some((node) => {
+      return node instanceof HTMLElement && window.getComputedStyle(node).position === 'absolute';
+    });
+
+    if (hasAbsoluteDescendants) {
+      const rootStyle = window.getComputedStyle(root);
+      if (rootStyle.position === 'static') {
+        root.style.position = 'relative';
+      }
+      if ((!rect || rect.width < 8) && !root.style.width) {
+        root.style.width = '160px';
+      }
+      if ((!rect || rect.height < 8) && !root.style.height) {
+        root.style.height = '120px';
+      }
+    }
+
+    __snapforgeReportSize();
+  }
+  if (window.requestAnimationFrame) {
+    window.requestAnimationFrame(__snapforgeRepairHtmlPreview);
+  } else {
+    setTimeout(__snapforgeRepairHtmlPreview, 30);
+  }
+  setTimeout(__snapforgeRepairHtmlPreview, 120);
   setTimeout(function() {
     if (typeof window.__snapforgeMarkReady === 'function') {
       window.__snapforgeMarkReady();
