@@ -330,19 +330,24 @@ function SelectField({
   return (
     <div style={{ flex: 1 }}>
       <div style={s.formLabel}>{label}</div>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={s.formInput}
-        disabled={disabled}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
+      <div style={addStyles.selectWrap}>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={addStyles.selectInput}
+          disabled={disabled}
+        >
+          <option value="" style={addStyles.selectOption}>
+            {placeholder}
           </option>
-        ))}
-      </select>
+          {options.map((option) => (
+            <option key={option.value} value={option.value} style={addStyles.selectOption}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <span style={addStyles.selectChevron}>▾</span>
+      </div>
     </div>
   )
 }
@@ -396,5 +401,29 @@ const addStyles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     background: 'var(--brand-bg)',
     color: 'var(--brand-text)',
+  },
+  selectWrap: {
+    position: 'relative' as const,
+  },
+  selectInput: {
+    ...s.formInput,
+    appearance: 'none' as const,
+    WebkitAppearance: 'none' as const,
+    MozAppearance: 'none' as const,
+    paddingRight: 34,
+    colorScheme: 'dark' as const,
+  },
+  selectOption: {
+    background: '#151821',
+    color: '#f5f7fb',
+  },
+  selectChevron: {
+    position: 'absolute' as const,
+    right: 12,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'var(--text-muted)',
+    pointerEvents: 'none' as const,
+    fontSize: 12,
   },
 }
