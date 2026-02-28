@@ -81,6 +81,9 @@ export function inferPreviewTheme(tags: string[] = [], source = '', _appThemeMod
   const backgroundTone = detectBackgroundTone(src)
   if (backgroundTone) return backgroundTone
 
+  if (_appThemeMode === 'dark') return 'dark'
+  if (_appThemeMode === 'light') return 'light'
+
   const looksLikeLoader =
     tagSet.has('animation') ||
     /\b(loader|spinner|domino|pulse|skeleton|progress)\b/i.test(src)
@@ -140,8 +143,9 @@ function parseColorToken(token: string): [number, number, number] | null {
   return [parts[0], parts[1], parts[2]]
 }
 
-function buildResizeScript(previewId: string): string {
+function buildResizeScript(previewId: string, layout: PreviewLayout): string {
   const serializedId = serializeForTemplate(previewId)
+  const shouldFit = layout === 'gallery'
   return `
       window.__snapforgePreviewReady = false;
       function __snapforgePostStatus(status, message) {
@@ -164,6 +168,23 @@ function buildResizeScript(previewId: string): string {
           "*"
         );
       }
+      function __snapforgeFitPreview() {
+        if (!${shouldFit}) return;
+        const stage = document.querySelector('.preview-stage');
+        const inner = document.querySelector('.preview-inner');
+        if (!(stage instanceof HTMLElement) || !(inner instanceof HTMLElement)) return;
+
+        inner.style.transform = 'none';
+
+        const stageWidth = stage.clientWidth;
+        const stageHeight = stage.clientHeight;
+        const innerRect = inner.getBoundingClientRect ? inner.getBoundingClientRect() : null;
+        if (!stageWidth || !stageHeight || !innerRect || !innerRect.width || !innerRect.height) return;
+
+        const scale = Math.min(1, stageWidth / innerRect.width, stageHeight / innerRect.height);
+        inner.style.transform = scale < 0.999 ? 'scale(' + scale + ')' : '';
+        __snapforgeReportSize();
+      }
       window.addEventListener('error', function(event) {
         const message = event && event.error && event.error.message
           ? event.error.message
@@ -175,10 +196,19 @@ function buildResizeScript(previewId: string): string {
         __snapforgePostStatus('error', String(reason));
       });
       setTimeout(__snapforgeReportSize, 50);
+      setTimeout(__snapforgeFitPreview, 60);
       window.addEventListener('load', __snapforgeReportSize);
+      window.addEventListener('load', __snapforgeFitPreview);
       if (window.ResizeObserver) {
-        const __snapforgeObserver = new ResizeObserver(__snapforgeReportSize);
+        const __snapforgeObserver = new ResizeObserver(function() {
+          __snapforgeFitPreview();
+          __snapforgeReportSize();
+        });
         __snapforgeObserver.observe(document.body);
+        const __snapforgeStage = document.querySelector('.preview-stage');
+        const __snapforgeInner = document.querySelector('.preview-inner');
+        if (__snapforgeStage instanceof HTMLElement) __snapforgeObserver.observe(__snapforgeStage);
+        if (__snapforgeInner instanceof HTMLElement) __snapforgeObserver.observe(__snapforgeInner);
       }
       window.__snapforgeMarkReady = function() {
         __snapforgePostStatus('ready', 'ok');
@@ -246,7 +276,7 @@ export function generateReactPreviewHtml(
       <script>
         window.__snapforgePreviewExports = {};
         window.__snapforgePreviewStyled = window.styled;
-        ${buildResizeScript(previewId)}
+        ${buildResizeScript(previewId, layout)}
         window.__snapforgeEnsureLayoutFallback = function() {
           const docEl = document.documentElement;
           const body = document.body;
@@ -297,6 +327,9 @@ export function generateReactPreviewHtml(
           if (Component) {
             root.render(React.createElement(Component));
             setTimeout(function() {
+              if (typeof window.__snapforgeFitPreview === 'function') {
+                window.__snapforgeFitPreview();
+              }
               if (typeof window.__snapforgeMarkReady === 'function') {
                 window.__snapforgeMarkReady();
               } else {
@@ -325,8 +358,11 @@ export function generateHtmlPreviewHtml(
   const bodyClass = `preview-theme-${theme}`
   return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-stage"><div class="preview-inner">${htmlSource}</div></div></div>
   <script>
-  ${buildResizeScript(previewId)}
+  ${buildResizeScript(previewId, layout)}
   setTimeout(function() {
+    if (typeof window.__snapforgeFitPreview === 'function') {
+      window.__snapforgeFitPreview();
+    }
     if (typeof window.__snapforgeMarkReady === 'function') {
       window.__snapforgeMarkReady();
     } else {
