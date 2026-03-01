@@ -6,6 +6,7 @@ export const PREVIEW_STATUS_EVENT = 'SNAPFORGE_PREVIEW_STATUS'
 export type PreviewTheme = 'light' | 'neutral' | 'dark'
 export type AppThemeMode = 'light' | 'dark'
 export type PreviewLayout = 'gallery' | 'modal'
+export type PreviewRenderType = 'react' | 'html'
 
 export function isUnsafePreviewSource(sourceCode: string): boolean {
   const lower = sourceCode.toLowerCase()
@@ -68,7 +69,12 @@ function getBasePreviewCss(layout: PreviewLayout = 'modal'): string {
   `
 }
 
-export function inferPreviewTheme(tags: string[] = [], source = '', _appThemeMode?: AppThemeMode): PreviewTheme {
+export function inferPreviewTheme(
+  tags: string[] = [],
+  source = '',
+  appThemeMode?: AppThemeMode,
+  renderType: PreviewRenderType = 'react',
+): PreviewTheme {
   const tagSet = new Set(tags.map((tag) => tag.toLowerCase()))
   const src = source.toLowerCase()
 
@@ -81,8 +87,11 @@ export function inferPreviewTheme(tags: string[] = [], source = '', _appThemeMod
   const backgroundTone = detectBackgroundTone(src)
   if (backgroundTone) return backgroundTone
 
-  if (_appThemeMode === 'dark') return 'dark'
-  if (_appThemeMode === 'light') return 'light'
+  if (renderType === 'react') {
+    if (appThemeMode === 'dark') return 'dark'
+    if (appThemeMode === 'light') return 'light'
+    return 'neutral'
+  }
 
   const looksLikeLoader =
     tagSet.has('animation') ||
@@ -143,9 +152,8 @@ function parseColorToken(token: string): [number, number, number] | null {
   return [parts[0], parts[1], parts[2]]
 }
 
-function buildResizeScript(previewId: string, layout: PreviewLayout): string {
+function buildResizeScript(previewId: string, shouldFit: boolean): string {
   const serializedId = serializeForTemplate(previewId)
-  const shouldFit = layout === 'gallery'
   return `
       window.__snapforgePreviewReady = false;
       function __snapforgePostStatus(status, message) {
@@ -276,7 +284,7 @@ export function generateReactPreviewHtml(
       <script>
         window.__snapforgePreviewExports = {};
         window.__snapforgePreviewStyled = window.styled;
-        ${buildResizeScript(previewId, layout)}
+        ${buildResizeScript(previewId, false)}
         window.__snapforgeEnsureLayoutFallback = function() {
           const docEl = document.documentElement;
           const body = document.body;
@@ -358,7 +366,7 @@ export function generateHtmlPreviewHtml(
   const bodyClass = `preview-theme-${theme}`
   return `<!doctype html><html><head><meta charset="utf-8"/><style>${getBasePreviewCss(layout)} ${cssSource || ''}</style></head><body class="${bodyClass}"><div id="preview-root"><div class="preview-stage"><div class="preview-inner">${htmlSource}</div></div></div>
   <script>
-  ${buildResizeScript(previewId, layout)}
+  ${buildResizeScript(previewId, layout === 'gallery')}
   setTimeout(function() {
     if (typeof window.__snapforgeFitPreview === 'function') {
       window.__snapforgeFitPreview();
