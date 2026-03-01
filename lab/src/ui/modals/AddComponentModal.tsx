@@ -8,7 +8,6 @@ import { s } from '../styles'
 import { CATEGORY_ORDER, formatTaxonomyLabel, getSubcategoryOptions } from '../../data/componentTaxonomy'
 import { classifyComponent } from '../../parser/classifyComponent'
 import { detectDependencies } from '../../parser/detectDependencies'
-import { detectFramework } from '../../parser/detectFramework'
 import { inferName } from '../../parser/inferName'
 
 type AddComponentModalProps = {
@@ -52,21 +51,23 @@ function AddComponentForm({
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
-  const [code, setCode] = useState('')
-  const [previewHtml, setPreviewHtml] = useState('')
-  const [previewCss, setPreviewCss] = useState('')
+  const [framework, setFramework] = useState<'react' | 'html'>('react')
+  const [reactCode, setReactCode] = useState('')
+  const [htmlCode, setHtmlCode] = useState('')
+  const [cssCode, setCssCode] = useState('')
   const [postprocessResult, setPostprocessResult] = useState<PostprocessResult | null>(null)
   const [saving, setSaving] = useState(false)
 
   const subcategoryOptions = getSubcategoryOptions(category)
+  const activeSource = framework === 'react' ? reactCode : buildHtmlCompositeSource(htmlCode, cssCode)
+  const canSave = Boolean(category && subcategory && (framework === 'react' ? reactCode.trim() : htmlCode.trim()))
 
   const analysis = useMemo<AnalysisSummary | null>(() => {
-    if (!code.trim() || !category || !subcategory) return null
+    if (!activeSource.trim() || !category || !subcategory) return null
 
-    const framework = detectFramework(code)
-    const tags = classifyComponent(code).tags
-    const dependencies = detectDependencies(code)
-    const suggestedName = inferName(code, { category, subcategory, tags })
+    const tags = classifyComponent(activeSource).tags
+    const dependencies = framework === 'react' ? detectDependencies(reactCode) : []
+    const suggestedName = inferName(activeSource, { category, subcategory, tags })
 
     return {
       framework,
@@ -74,7 +75,7 @@ function AddComponentForm({
       dependencies,
       suggestedName,
     }
-  }, [category, code, subcategory])
+  }, [activeSource, category, cssCode, framework, htmlCode, reactCode, subcategory])
 
   const handleCategoryChange = (value: string) => {
     setCategory(value)
@@ -83,32 +84,36 @@ function AddComponentForm({
   }
 
   const handleConfirm = async () => {
-    if (!code.trim() || !category || !subcategory || saving) return
+    if (!canSave || saving) return
 
     const summary = analysis ?? {
-      framework: detectFramework(code),
-      tags: classifyComponent(code).tags,
-      dependencies: detectDependencies(code),
-      suggestedName: inferName(code, { category, subcategory, tags: [] }),
+      framework,
+      tags: classifyComponent(activeSource).tags,
+      dependencies: framework === 'react' ? detectDependencies(reactCode) : [],
+      suggestedName: inferName(activeSource, { category, subcategory, tags: [] }),
     }
 
-    if (summary.framework === 'react' && isUnsafePreviewSource(code)) {
+    if (summary.framework === 'react' && isUnsafePreviewSource(reactCode)) {
       showToast('Blocked: preview source contains restricted tokens (<script, window., document., eval().', 'error')
       return
     }
 
     setSaving(true)
 
+    const htmlSource = framework === 'html' ? htmlCode.trim() : ''
+    const cssSource = framework === 'html' ? cssCode.trim() : ''
+    const code = framework === 'react' ? reactCode.trim() : buildHtmlCompositeSource(htmlSource, cssSource)
+
     const payload = {
-      framework: summary.framework,
+      framework,
       name: name.trim() || summary.suggestedName,
       category,
       subcategory,
       tags: summary.tags,
       dependencies: summary.dependencies,
       code,
-      htmlSource: summary.framework === 'html' ? (previewHtml.trim() || undefined) : undefined,
-      cssSource: summary.framework === 'html' ? (previewCss.trim() || undefined) : undefined,
+      htmlSource: framework === 'html' ? (htmlSource || undefined) : undefined,
+      cssSource: framework === 'html' ? (cssSource || undefined) : undefined,
     }
 
     let relativePath = ''
@@ -199,39 +204,47 @@ function AddComponentForm({
         Choose exactly where this component should live in the library. No auto-placement.
       </div>
 
-      <div>
-        <div style={s.formLabel}>Code</div>
-        <textarea
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="Paste your component code here..."
-          style={{ ...s.formInput, minHeight: 200, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
-        />
-      </div>
+      <SelectField
+        label="Framework"
+        value={framework}
+        onChange={(value) => setFramework(value as 'react' | 'html')}
+        options={[
+          { value: 'react', label: 'React' },
+          { value: 'html', label: 'HTML + CSS' },
+        ]}
+        placeholder="Choose a framework"
+      />
 
-      <div>
-        <div style={s.formLabel}>Preview HTML (optional)</div>
-        <textarea
-          value={previewHtml}
-          onChange={(e) => setPreviewHtml(e.target.value)}
-          placeholder="HTML used for runtime iframe preview"
-          style={{ ...s.formInput, minHeight: 120, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
+      {framework === 'react' ? (
+        <CodeField
+          label="React Code"
+          value={reactCode}
+          onChange={setReactCode}
+          placeholder="Paste your React component code here..."
+          minHeight={220}
         />
-      </div>
-
-      <div>
-        <div style={s.formLabel}>Preview CSS (optional)</div>
-        <textarea
-          value={previewCss}
-          onChange={(e) => setPreviewCss(e.target.value)}
-          placeholder="Optional CSS for iframe preview"
-          style={{ ...s.formInput, minHeight: 100, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
-        />
-      </div>
+      ) : (
+        <>
+          <CodeField
+            label="HTML"
+            value={htmlCode}
+            onChange={setHtmlCode}
+            placeholder="Paste your HTML markup here..."
+            minHeight={180}
+          />
+          <CodeField
+            label="CSS"
+            value={cssCode}
+            onChange={setCssCode}
+            placeholder="Paste your CSS here..."
+            minHeight={160}
+          />
+        </>
+      )}
 
       <div style={addStyles.summaryCard}>
         <div style={addStyles.sectionHeader}>Save Summary</div>
-        <SummaryRow label="Framework" value={analysis?.framework || 'Waiting for code'} />
+        <SummaryRow label="Framework" value={framework === 'react' ? 'React' : 'HTML + CSS'} />
         <SummaryRow
           label="Location"
           value={category && subcategory ? `${formatTaxonomyLabel(category)} / ${formatTaxonomyLabel(subcategory)}` : 'Choose a category and subcategory'}
@@ -254,7 +267,7 @@ function AddComponentForm({
       <button
         style={s.submitBtn}
         onClick={handleConfirm}
-        disabled={saving || !code.trim() || !category || !subcategory}
+        disabled={saving || !canSave}
       >
         {saving ? 'Saving...' : 'Save Component'}
       </button>
@@ -307,6 +320,32 @@ function FormField({ label, value, onChange, placeholder }: {
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         style={s.formInput}
+      />
+    </div>
+  )
+}
+
+function CodeField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  minHeight,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  minHeight: number
+}) {
+  return (
+    <div>
+      <div style={s.formLabel}>{label}</div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...s.formInput, minHeight, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }}
       />
     </div>
   )
@@ -426,4 +465,13 @@ const addStyles: Record<string, React.CSSProperties> = {
     pointerEvents: 'none' as const,
     fontSize: 12,
   },
+}
+
+function buildHtmlCompositeSource(htmlSource: string, cssSource: string): string {
+  const html = htmlSource.trim()
+  const css = cssSource.trim()
+  if (!html && !css) return ''
+  if (!css) return html
+  if (!html) return `<style>\n${css}\n</style>`
+  return `${html}\n\n<style>\n${css}\n</style>`
 }

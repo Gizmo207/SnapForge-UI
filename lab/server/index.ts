@@ -243,22 +243,26 @@ app.post('/save-component', requireAuth, async (req, res) => {
   }
 
   const { name, code, htmlSource, cssSource, framework, category, subcategory, tags, dependencies } = req.body;
+  const normalizedFramework = framework === 'react' || framework === 'html' ? framework : 'react';
+  const hasPrimarySource = normalizedFramework === 'react'
+    ? typeof code === 'string' && code.trim().length > 0
+    : typeof htmlSource === 'string' && htmlSource.trim().length > 0;
 
-  if (!name || !code || !category || !subcategory) {
+  if (!name || !category || !subcategory || !hasPrimarySource) {
     res.status(400).json({
       success: false,
       status: 'error',
-      message: 'Missing required fields: name, code, category, subcategory',
+      message: 'Missing required fields: name, category, subcategory, and source code',
     });
     return;
   }
 
   const result = await saveComponent({
     name,
-    code,
+    code: typeof code === 'string' ? code : '',
     htmlSource,
     cssSource,
-    framework: framework || 'html',
+    framework: normalizedFramework,
     category,
     subcategory,
     tags: tags || [],

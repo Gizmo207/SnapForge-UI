@@ -8,7 +8,7 @@ export type SaveRequest = {
   code: string;
   htmlSource?: string;
   cssSource?: string;
-  framework: string;
+  framework: 'react' | 'html';
   category: string;
   subcategory: string;
   tags: string[];
@@ -208,12 +208,13 @@ export async function initStore(): Promise<void> {
     `);
 
     // Backfill sanitize for legacy source rows so old invalid JSX style keys don't break preview.
-    const sourceRows = await pool.query<{ id: number; source: string }>(`
-      SELECT id, source
+    const sourceRows = await pool.query<{ id: number; source: string; type: string }>(`
+      SELECT id, source, type
       FROM components
       WHERE source IS NOT NULL;
     `);
     for (const row of sourceRows.rows) {
+      if (row.type !== 'react') continue;
       const sanitized = sanitize(row.source).source;
       if (sanitized !== row.source) {
         await pool.query(
@@ -259,6 +260,11 @@ function detectFramework(code: string): 'react' | 'html' {
   return hasReactImport || hasUseState ? 'react' : 'html';
 }
 
+function normalizeFramework(value: string | undefined, code: string): 'react' | 'html' {
+  if (value === 'react' || value === 'html') return value;
+  return detectFramework(code);
+}
+
 function extractImports(code: string): { imports: string; body: string } {
   const lines = code.split('\n');
   const importLines: string[] = [];
@@ -286,6 +292,10 @@ function extractImports(code: string): { imports: string; body: string } {
 }
 
 function wrapCode(req: SaveRequest): string {
+  if (req.framework === 'html') {
+    return req.code.trim() || composeHtmlSource(req.htmlSource || '', req.cssSource || '');
+  }
+
   const meta = generateMeta(req);
 
   if (req.code.includes('export const meta')) {
@@ -303,6 +313,17 @@ function wrapCode(req: SaveRequest): string {
   if (!hasDefault) result += `\n\nexport default ${componentName};\n`;
 
   return result;
+}
+
+function composeHtmlSource(htmlSource: string, cssSource: string): string {
+  const html = htmlSource.trim();
+  const css = cssSource.trim();
+
+  if (!html && !css) return '';
+  if (!css) return html;
+  if (!html) return `<style>\n${css}\n</style>`;
+
+  return `${html}\n\n<style>\n${css}\n</style>`;
 }
 
 function normalizeArray(values: string[] | undefined): string[] {
@@ -361,12 +382,12 @@ function canonicalizeSubcategory(value: string): string {
 }
 
 function mapRowToCatalogItem(row: DbComponentRow): ComponentCatalogItem {
-  const sanitizedSource = sanitize(row.source).source;
+  const normalizedSource = row.type === 'react' ? sanitize(row.source).source : row.source;
   const normalizedSubcategory = canonicalizeSubcategory(row.subcategory);
   return {
     path: `${row.slug}/react.tsx`,
     componentDir: row.slug,
-    source: sanitizedSource,
+    source: normalizedSource,
     htmlSource: row.html_source ?? undefined,
     cssSource: row.css_source ?? undefined,
     meta: {
@@ -407,7 +428,7 @@ export async function deleteComponent(filePath: string, userId: string): Promise
 export async function saveComponent(req: SaveRequest, userId: string): Promise<SaveResult> {
   await initStore();
 
-  const detectedFramework = detectFramework(req.code);
+  const detectedFramework = normalizeFramework(req.framework, req.code);
   const category = normalizeSegment(req.category, 'components');
   const rawSubcategory = normalizeSegment(req.subcategory, 'misc');
   const subcategory = canonicalizeSubcategory(rawSubcategory);
@@ -427,7 +448,7 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
       tags: normalizeArray(req.tags),
       dependencies: normalizeArray(req.dependencies),
     });
-    const sanitizedCode = sanitize(finalCode).source;
+    const storedCode = detectedFramework === 'react' ? sanitize(finalCode).source : finalCode;
 
     const result = await pool.query<{ slug: string }>(
       `
@@ -448,9 +469,9 @@ export async function saveComponent(req: SaveRequest, userId: string): Promise<S
         detectedFramework,
         normalizeArray(req.tags),
         normalizeArray(req.dependencies),
-        sanitizedCode,
-        detectedFramework === 'html' && req.htmlSource?.trim() ? req.htmlSource : null,
-        detectedFramework === 'html' && req.cssSource?.trim() ? req.cssSource : null,
+        storedCode,
+        detectedFramework === 'html' && req.htmlSource?.trim() ? req.htmlSource.trim() : null,
+        detectedFramework === 'html' && req.cssSource?.trim() ? req.cssSource.trim() : null,
       ],
     );
 
@@ -502,6 +523,7 @@ export async function listComponents(userId: string): Promise<ComponentCatalogIt
 type ComponentSourceRecord = {
   id: number;
   source: string;
+  type: string;
 };
 
 async function getComponentSource(filePath: string, userId: string): Promise<ComponentSourceRecord | null> {
@@ -511,7 +533,7 @@ async function getComponentSource(filePath: string, userId: string): Promise<Com
   if (!slug || slug.includes('..')) return null;
 
   const result = await pool.query<ComponentSourceRecord>(
-    'SELECT id, source FROM components WHERE slug = $1 AND owner_id = $2 LIMIT 1',
+    'SELECT id, source, type FROM components WHERE slug = $1 AND owner_id = $2 LIMIT 1',
     [slug, userId],
   );
 
@@ -535,6 +557,18 @@ export async function postprocessComponent(filePath: string, userId: string): Pr
       parseResult: {
         parseOk: false,
         parseErrors: [{ message: `File not found: ${filePath}`, line: null, column: null }],
+      },
+    };
+  }
+
+  if (record.type !== 'react') {
+    return {
+      found: true,
+      sanitized: false,
+      appliedRules: [],
+      parseResult: {
+        parseOk: true,
+        parseErrors: [],
       },
     };
   }
